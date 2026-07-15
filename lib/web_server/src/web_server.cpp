@@ -70,7 +70,7 @@ void handleConfigPost(AsyncWebServerRequest* req, uint8_t* data, size_t len,
     Geocoder g(*s_http);
     if (!g.resolver(dir, lat, lon)) {
       req->send(400, "text/plain",
-                "Dirección no encontrada. Prueba a añadir ciudad y país.");
+                "Ubicación no encontrada. Prueba con código postal + país (ej: 28013 España) o dirección completa.");
       return;
     }
   }
@@ -97,6 +97,24 @@ void handleReset(AsyncWebServerRequest* req) {
   ESP.restart();
 }
 
+void handleScan(AsyncWebServerRequest* req) {
+  int n = WiFi.scanNetworks(/*async=*/false, /*show_hidden=*/false);
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
+  for (int i = 0; i < n; ++i) {
+    String ssid = WiFi.SSID(i);
+    if (ssid.length() == 0) continue;
+    JsonObject o = arr.add<JsonObject>();
+    o["ssid"] = ssid;
+    o["rssi"] = WiFi.RSSI(i);
+    o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+  }
+  WiFi.scanDelete();
+  String out;
+  serializeJson(doc, out);
+  req->send(200, "application/json", out);
+}
+
 }  // namespace
 
 void RadarWebServer::iniciar(const Config& cfg, RadarState& estado, IHttpClient& http) {
@@ -113,6 +131,7 @@ void RadarWebServer::iniciar(const Config& cfg, RadarState& estado, IHttpClient&
   server.on("/api/config",   HTTP_POST,
             [](AsyncWebServerRequest*) {}, nullptr, handleConfigPost);
   server.on("/api/reset",    HTTP_POST, handleReset);
+  server.on("/api/scan",     HTTP_GET, handleScan);
   server.begin();
   Serial.println("[web] servidor iniciado");
 }

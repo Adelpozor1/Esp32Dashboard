@@ -11,9 +11,20 @@
   <p style="margin-bottom:12px; color:#8b949e;">Al guardar cambios la placa se reiniciará (~3 s).</p>
   <div id="msg"></div>
   <form id="f">
-    <div><label>SSID</label><input name="ssid" required maxlength="128"></div>
+    <div>
+      <label>Red WiFi</label>
+      <div style="display:flex; gap:6px;">
+        <select id="ssid-select" name="ssid" required style="flex:1;">
+          <option value="">Buscando redes...</option>
+        </select>
+        <button type="button" id="rescan" style="width:auto; padding:0 12px;">🔄</button>
+      </div>
+      <div style="font-size:11px; color:#8b949e; margin-top:4px;">
+        ¿No aparece? <a href="#" id="ssid-manual" style="color:#79b8ff;">Escribir a mano</a>
+      </div>
+    </div>
     <div><label>Password</label><input name="password" type="password" required maxlength="128"></div>
-    <div><label>Dirección postal</label><input name="direccion" required maxlength="128"></div>
+    <div><label>Ubicación (dirección o código postal)</label><input name="direccion" required maxlength="128" placeholder="ej: 28013 España   o   Calle Mayor 1, Madrid"></div>
     <div><label>Radio (km)</label><input name="radio_km" type="number" min="1" max="500" required></div>
     <button type="submit">Guardar y reiniciar</button>
   </form>
@@ -21,15 +32,65 @@
   <h2>Reset total</h2>
   <button id="reset" style="background:#da3633;">Borrar config y volver al portal</button>
   <script>
+    let ssidActual = '';
+
+    async function escanear() {
+      const sel = document.getElementById('ssid-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Buscando redes...</option>';
+      try {
+        const r = await fetch('/api/scan');
+        const redes = await r.json();
+        if (!redes.length) {
+          sel.innerHTML = '<option value="">(ninguna red detectada)</option>';
+          return;
+        }
+        redes.sort((a, b) => b.rssi - a.rssi);
+        sel.innerHTML = '<option value="">-- elige tu red --</option>';
+        let encontradaActual = false;
+        for (const r of redes) {
+          const opt = document.createElement('option');
+          opt.value = r.ssid;
+          const bars = r.rssi > -55 ? '████' : r.rssi > -70 ? '███░' : r.rssi > -85 ? '██░░' : '█░░░';
+          opt.textContent = `${r.ssid}  ${bars}${r.open ? '  (abierta)' : ''}`;
+          if (r.ssid === ssidActual) { opt.selected = true; encontradaActual = true; }
+          sel.appendChild(opt);
+        }
+        if (ssidActual && !encontradaActual) {
+          const opt = document.createElement('option');
+          opt.value = ssidActual;
+          opt.textContent = `${ssidActual}  (guardada, no visible ahora)`;
+          opt.selected = true;
+          sel.appendChild(opt);
+        }
+      } catch (e) {
+        sel.innerHTML = '<option value="">(error escaneando)</option>';
+      }
+    }
+
     async function precargar() {
       const r = await fetch('/api/config');
       if (!r.ok) return;
       const cfg = await r.json();
-      for (const k of ['ssid', 'password', 'direccion', 'radio_km']) {
+      ssidActual = cfg.ssid || '';
+      for (const k of ['password', 'direccion', 'radio_km']) {
         const el = document.querySelector('[name=' + k + ']');
         if (el && cfg[k] !== undefined) el.value = cfg[k];
       }
+      escanear();
     }
+
+    document.getElementById('rescan').addEventListener('click', escanear);
+    document.getElementById('ssid-manual').addEventListener('click', (e) => {
+      e.preventDefault();
+      const sel = document.getElementById('ssid-select');
+      if (!sel) return;
+      const inp = document.createElement('input');
+      inp.name = 'ssid'; inp.required = true; inp.maxLength = 128;
+      inp.placeholder = 'Nombre exacto de la red';
+      inp.value = ssidActual;
+      sel.parentNode.replaceChild(inp, sel);
+    });
     precargar();
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();

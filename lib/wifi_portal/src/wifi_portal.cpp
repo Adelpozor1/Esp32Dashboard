@@ -23,13 +23,32 @@ void WifiPortal::ejecutar(IHttpClient& http) {
   StatusLed::setEstado(EstadoLed::PORTAL);
 
   String ssidAp = String("RadarVuelos-") + macSufijo();
-  WiFi.mode(WIFI_AP);
+  // AP+STA para poder levantar el portal y a la vez escanear redes cercanas.
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ssidAp.c_str());
   Serial.printf("[portal] AP levantado: %s  IP: %s\n",
                 ssidAp.c_str(), WiFi.softAPIP().toString().c_str());
 
   static AsyncWebServer server(80);
   server.serveStatic("/", LittleFS, "/").setDefaultFile("portal.html");
+
+  server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
+    int n = WiFi.scanNetworks(/*async=*/false, /*show_hidden=*/false);
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n; ++i) {
+      String ssid = WiFi.SSID(i);
+      if (ssid.length() == 0) continue;
+      JsonObject o = arr.add<JsonObject>();
+      o["ssid"] = ssid;
+      o["rssi"] = WiFi.RSSI(i);
+      o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+    }
+    WiFi.scanDelete();
+    String out;
+    serializeJson(doc, out);
+    req->send(200, "application/json", out);
+  });
 
   server.on("/api/save", HTTP_POST,
     [](AsyncWebServerRequest*) {},
@@ -53,7 +72,7 @@ void WifiPortal::ejecutar(IHttpClient& http) {
       double lat = 0, lon = 0;
       if (!g.resolver(dir, lat, lon)) {
         req->send(400, "text/plain",
-                  "Dirección no encontrada. Prueba a añadir ciudad y país.");
+                  "Ubicación no encontrada. Prueba con código postal + país (ej: 28013 España) o dirección completa.");
         return;
       }
       Config cfg;

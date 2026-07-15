@@ -12,16 +12,25 @@
   <div id="msg"></div>
   <form id="f">
     <div>
-      <label>SSID (nombre de la red WiFi)</label>
-      <input name="ssid" required maxlength="128">
+      <label>Red WiFi</label>
+      <div style="display:flex; gap:6px;">
+        <select id="ssid-select" name="ssid" required style="flex:1;">
+          <option value="">Buscando redes...</option>
+        </select>
+        <button type="button" id="rescan" style="width:auto; padding:0 12px;">🔄</button>
+      </div>
+      <div style="font-size:11px; color:#8b949e; margin-top:4px;">
+        ¿No aparece? <a href="#" id="ssid-manual" style="color:#79b8ff;">Escribir a mano</a>
+      </div>
     </div>
     <div>
       <label>Password</label>
       <input name="password" type="password" required maxlength="128">
     </div>
     <div>
-      <label>Dirección postal (ej: "Calle Mayor 1, Madrid, España")</label>
-      <input name="direccion" required maxlength="128">
+      <label>Ubicación (dirección o código postal)</label>
+      <input name="direccion" required maxlength="128"
+             placeholder="ej: 28013 España   o   Calle Mayor 1, Madrid">
     </div>
     <div>
       <label>Radio de vigilancia (km)</label>
@@ -30,6 +39,39 @@
     <button type="submit">Guardar y reiniciar</button>
   </form>
   <script>
+    async function escanear() {
+      const sel = document.getElementById('ssid-select');
+      sel.innerHTML = '<option value="">Buscando redes...</option>';
+      try {
+        const r = await fetch('/api/scan');
+        const redes = await r.json();
+        if (!redes.length) {
+          sel.innerHTML = '<option value="">(ninguna red detectada)</option>';
+          return;
+        }
+        redes.sort((a, b) => b.rssi - a.rssi);
+        sel.innerHTML = '<option value="">-- elige tu red --</option>';
+        for (const r of redes) {
+          const opt = document.createElement('option');
+          opt.value = r.ssid;
+          const bars = r.rssi > -55 ? '████' : r.rssi > -70 ? '███░' : r.rssi > -85 ? '██░░' : '█░░░';
+          opt.textContent = `${r.ssid}  ${bars}${r.open ? '  (abierta)' : ''}`;
+          sel.appendChild(opt);
+        }
+      } catch (e) {
+        sel.innerHTML = '<option value="">(error escaneando)</option>';
+      }
+    }
+    document.getElementById('rescan').addEventListener('click', escanear);
+    document.getElementById('ssid-manual').addEventListener('click', (e) => {
+      e.preventDefault();
+      const sel = document.getElementById('ssid-select');
+      const inp = document.createElement('input');
+      inp.name = 'ssid'; inp.required = true; inp.maxLength = 128;
+      inp.placeholder = 'Nombre exacto de la red';
+      sel.parentNode.replaceChild(inp, sel);
+    });
+    escanear();
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = document.getElementById('msg');
