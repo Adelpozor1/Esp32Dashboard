@@ -25,6 +25,72 @@ String macSufijo() {
 String s_scanCache = "[]";
 volatile bool s_pedirScan = true;
 
+// Estado del proceso de guardado (que también se saca del thread async_tcp).
+enum class EstadoGuardar { OCIOSO, PROCESANDO, ERROR };
+volatile EstadoGuardar s_estadoGuardar = EstadoGuardar::OCIOSO;
+String s_ultimoError = "";
+
+struct DatosGuardar {
+  std::string ssid;
+  std::string password;
+  std::string direccion;
+  int radio_km;
+  IHttpClient* http;
+};
+
+void tareaGuardar(void* param) {
+  auto* d = static_cast<DatosGuardar*>(param);
+  Serial.printf("[save] conectando a %s...\n", d->ssid.c_str());
+  WiFi.begin(d->ssid.c_str(), d->password.c_str());
+  uint32_t inicio = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
+    vTaskDelay(pdMS_TO_TICKS(200));
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[save] WiFi no conecta");
+    s_ultimoError = "No se puede conectar a la WiFi. Comprueba SSID y password.";
+    s_estadoGuardar = EstadoGuardar::ERROR;
+    delete d;
+    vTaskDelete(nullptr);
+    return;
+  }
+  Serial.printf("[save] WiFi OK, IP: %s\n", WiFi.localIP().toString().c_str());
+
+  Serial.println("[save] geocoding...");
+  Geocoder g(*d->http);
+  double lat = 0, lon = 0;
+  if (!g.resolver(d->direccion, lat, lon)) {
+    Serial.println("[save] geocoding falló");
+    s_ultimoError = "Ubicación no encontrada. Prueba con código postal + país (ej: 28013 España).";
+    s_estadoGuardar = EstadoGuardar::ERROR;
+    delete d;
+    vTaskDelete(nullptr);
+    return;
+  }
+  Serial.printf("[save] geocoding OK: %.4f,%.4f\n", lat, lon);
+
+  Config cfg;
+  cfg.ssid = d->ssid;
+  cfg.password = d->password;
+  cfg.direccion = d->direccion;
+  cfg.lat = lat;
+  cfg.lon = lon;
+  cfg.radio_km = d->radio_km;
+  if (!ConfigStore::guardar(cfg)) {
+    Serial.println("[save] error NVS");
+    s_ultimoError = "Error guardando en NVS.";
+    s_estadoGuardar = EstadoGuardar::ERROR;
+    delete d;
+    vTaskDelete(nullptr);
+    return;
+  }
+  Serial.println("[save] guardado OK, reiniciando en 500ms");
+  delete d;
+  delay(500);
+  ESP.restart();
+  // no vuelve
+}
+
 void tareaScanPortal(void*) {
   for (;;) {
     if (s_pedirScan) {
@@ -79,11 +145,28 @@ void WifiPortal::ejecutar(IHttpClient& http) {
     req->send(200, "text/plain", "OK");
   });
 
+  server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
+    JsonDocument doc;
+    switch (s_estadoGuardar) {
+      case EstadoGuardar::OCIOSO:      doc["estado"] = "ocioso";     break;
+      case EstadoGuardar::PROCESANDO:  doc["estado"] = "procesando"; break;
+      case EstadoGuardar::ERROR:       doc["estado"] = "error";
+                                       doc["error"] = s_ultimoError; break;
+    }
+    String out;
+    serializeJson(doc, out);
+    req->send(200, "application/json", out);
+  });
+
   server.on("/api/save", HTTP_POST,
     [](AsyncWebServerRequest*) {},
     nullptr,
     [&http](AsyncWebServerRequest* req, uint8_t* data, size_t len,
             size_t /*index*/, size_t /*total*/) {
+      if (s_estadoGuardar == EstadoGuardar::PROCESANDO) {
+        req->send(409, "text/plain", "Ya hay un guardado en curso");
+        return;
+      }
       JsonDocument doc;
       if (deserializeJson(doc, data, len)) {
         req->send(400, "text/plain", "JSON inválido");
@@ -97,43 +180,14 @@ void WifiPortal::ejecutar(IHttpClient& http) {
         req->send(400, "text/plain", "Campos obligatorios vacíos");
         return;
       }
-      // Antes de geocoding, conectar a la WiFi indicada — Nominatim
-      // requiere internet y en Modo Portal solo teníamos el AP levantado.
-      Serial.printf("[portal] conectando a %s para geocoding...\n", ssid.c_str());
-      WiFi.begin(ssid.c_str(), pass.c_str());
-      uint32_t inicio = millis();
-      while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
-        delay(200);
-      }
-      if (WiFi.status() != WL_CONNECTED) {
-        req->send(400, "text/plain",
-                  "No se puede conectar a la WiFi indicada. Comprueba SSID y password.");
-        return;
-      }
-      Serial.printf("[portal] WiFi conectada, IP: %s\n",
-                    WiFi.localIP().toString().c_str());
-
-      Geocoder g(http);
-      double lat = 0, lon = 0;
-      if (!g.resolver(dir, lat, lon)) {
-        req->send(400, "text/plain",
-                  "Ubicación no encontrada. Prueba con código postal + país (ej: 28013 España) o dirección completa.");
-        return;
-      }
-      Config cfg;
-      cfg.ssid = ssid;
-      cfg.password = pass;
-      cfg.direccion = dir;
-      cfg.lat = lat;
-      cfg.lon = lon;
-      cfg.radio_km = radio;
-      if (!ConfigStore::guardar(cfg)) {
-        req->send(500, "text/plain", "Error guardando en NVS");
-        return;
-      }
-      req->send(200, "text/plain", "OK, reiniciando");
-      delay(500);
-      ESP.restart();
+      // El trabajo pesado (WiFi.begin + geocoding + guardar + reboot) se
+      // saca del thread async_tcp para evitar Task Watchdog. La task se
+      // auto-elimina con vTaskDelete al terminar.
+      auto* d = new DatosGuardar{ssid, pass, dir, radio, &http};
+      s_ultimoError = "";
+      s_estadoGuardar = EstadoGuardar::PROCESANDO;
+      xTaskCreatePinnedToCore(tareaGuardar, "guardar", 8192, d, 1, nullptr, 1);
+      req->send(202, "text/plain", "Procesando");
     });
 
   // serveStatic va DESPUÉS de las rutas específicas para no eclipsarlas.

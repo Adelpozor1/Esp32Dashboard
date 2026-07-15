@@ -83,19 +83,40 @@
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = document.getElementById('msg');
-      msg.innerHTML = '<div class="msg-ok">Conectando a tu WiFi y resolviendo la dirección... esto puede tardar 20-30 s.</div>';
       const data = Object.fromEntries(new FormData(e.target));
+
+      msg.innerHTML = '<div class="msg-ok">Enviando...</div>';
       const r = await fetch('/api/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
       });
-      if (r.ok) {
-        msg.innerHTML = '<div class="msg-ok">¡Guardado! La placa se reiniciará en unos segundos.</div>';
-      } else {
-        const err = await r.text();
-        msg.innerHTML = '<div class="msg-error">Error: ' + err + '</div>';
+      if (!r.ok) {
+        msg.innerHTML = '<div class="msg-error">Error: ' + await r.text() + '</div>';
+        return;
       }
+      msg.innerHTML = '<div class="msg-ok">Conectando a tu WiFi y resolviendo la dirección... esto puede tardar 20-30 s.</div>';
+
+      // Polling del estado. La placa está en Modo Portal aún; cuando termine
+      // guarda la config y hace ESP.restart() → perdemos el AP y el fetch falla,
+      // que interpretamos como éxito (la placa está reiniciando en Modo Radar).
+      const inicio = Date.now();
+      while (Date.now() - inicio < 45000) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const s = await fetch('/api/status', {cache: 'no-store'});
+          const st = await s.json();
+          if (st.estado === 'error') {
+            msg.innerHTML = '<div class="msg-error">Error: ' + (st.error || 'desconocido') + '</div>';
+            return;
+          }
+        } catch (e) {
+          // Conexión perdida → probablemente reboot en curso
+          msg.innerHTML = '<div class="msg-ok">¡Guardado! La placa está reiniciando en Modo Radar. Conéctate a tu WiFi de casa para acceder al radar.</div>';
+          return;
+        }
+      }
+      msg.innerHTML = '<div class="msg-error">Timeout. Comprueba el estado desde la pantalla de la placa.</div>';
     });
   </script>
 </body>
