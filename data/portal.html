@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configurar Radar de vuelos</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Radar de vuelos — configuración inicial</h1>
+  <p style="margin-bottom:12px; color:#8b949e;">Introduce los datos de tu WiFi y la dirección desde la que quieres vigilar.</p>
+  <div id="msg"></div>
+  <form id="f">
+    <div>
+      <label>SSID (nombre de la red WiFi)</label>
+      <input name="ssid" required maxlength="128">
+    </div>
+    <div>
+      <label>Password</label>
+      <input name="password" type="password" required maxlength="128">
+    </div>
+    <div>
+      <label>Dirección postal (ej: "Calle Mayor 1, Madrid, España")</label>
+      <input name="direccion" required maxlength="128">
+    </div>
+    <div>
+      <label>Radio de vigilancia (km)</label>
+      <input name="radio_km" type="number" value="25" min="1" max="500" required>
+    </div>
+    <button type="submit">Guardar y reiniciar</button>
+  </form>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg');
+      msg.innerHTML = '<div class="msg-ok">Resolviendo dirección y guardando...</div>';
+      const data = Object.fromEntries(new FormData(e.target));
+      const r = await fetch('/api/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      if (r.ok) {
+        msg.innerHTML = '<div class="msg-ok">¡Guardado! La placa se reiniciará en unos segundos.</div>';
+      } else {
+        const err = await r.text();
+        msg.innerHTML = '<div class="msg-error">Error: ' + err + '</div>';
+      }
+    });
+  </script>
+</body>
+</html>

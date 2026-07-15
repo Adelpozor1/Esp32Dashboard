@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radar de vuelos</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Radar de vuelos</h1>
+  <div id="stale" style="display:none" class="banner-stale">Sin conexión con la API — mostrando último snapshot conocido.</div>
+  <div class="radar-wrap">
+    <canvas id="radar" width="500" height="500"></canvas>
+    <div>
+      <h2>Aviones detectados (<span id="n">0</span>)</h2>
+      <table>
+        <thead>
+          <tr><th>Callsign</th><th>Alt (ft)</th><th>Dist (km)</th><th>Rumbo</th></tr>
+        </thead>
+        <tbody id="lista"></tbody>
+      </table>
+    </div>
+  </div>
+  <p style="margin-top:16px; font-size:12px; color:#8b949e;">
+    <a href="/config" style="color:#79b8ff;">Reconfigurar</a> ·
+    Datos: <a href="https://adsb.lol" style="color:#79b8ff;">ADSB.lol</a>
+  </p>
+  <script src="/app.js"></script>
+</body>
+</html>
