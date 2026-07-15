@@ -1,0 +1,23 @@
+{
+  "name": "adsb_client",
+  "version": "0.1.0",
+  "description": "Cliente ADSB.lol para consulta de aviones cercanos con cálculo de distancia y bearing",
+  "keywords": [
+    "adsb",
+    "adsb.lol",
+    "aviación",
+    "aviones",
+    "geo",
+    "distancia",
+    "bearing"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
