@@ -18,16 +18,17 @@ constexpr int RADAR_LADO     = 240;         // cuadrado a la izquierda
 constexpr int PANEL_X        = RADAR_LADO;  // panel info empieza aquí
 constexpr int PANEL_ANCHO    = PANTALLA_ANCHO - RADAR_LADO;
 
-// Paleta sonar clásico (RGB565) — verde fosforito sobre negro.
+// Paleta sonar clásico (RGB565) — verde fosforito sobre negro, bien marcado.
 constexpr uint16_t COL_FONDO       = 0x0000;   // negro
-constexpr uint16_t COL_GRID        = 0x0300;   // verde oscuro para círculos
-constexpr uint16_t COL_EJE         = 0x0400;   // verde un poco más marcado
-constexpr uint16_t COL_GRID_TXT    = 0x0480;   // etiquetas radio
-constexpr uint16_t COL_CARDINAL    = 0x0740;   // N/S/E/W verde brillante
-constexpr uint16_t COL_CENTRO      = 0xFC00;   // amarillo (posición del observador)
-constexpr uint16_t COL_AVION_LEJOS = 0x02C0;   // verde tenue
-constexpr uint16_t COL_AVION       = 0x0680;   // verde nítido
-constexpr uint16_t COL_AVION_HIT   = 0x07E0;   // verde máx cuando el barrido lo toca
+constexpr uint16_t COL_GRID        = 0x0540;   // círculos internos, verde medio
+constexpr uint16_t COL_GRID_BORDE  = 0x07C0;   // círculo exterior, verde brillante
+constexpr uint16_t COL_EJE         = 0x0620;   // ejes NSEW bien marcados
+constexpr uint16_t COL_GRID_TXT    = 0x06C0;   // etiquetas radio y grados
+constexpr uint16_t COL_CARDINAL    = 0x07E0;   // N/S/E/W verde máximo
+constexpr uint16_t COL_CENTRO      = 0xFC00;   // amarillo (observador)
+constexpr uint16_t COL_AVION_TENUE = 0x0400;   // avión no iluminado por barrido
+constexpr uint16_t COL_AVION_TAG   = 0x0580;   // etiqueta callsign no iluminada
+constexpr uint16_t COL_AVION_HIT   = 0x07E0;   // avión iluminado por el barrido
 constexpr uint16_t COL_ENCIMA      = 0xF800;   // rojo cuando dist<3km
 constexpr uint16_t COL_STALE       = 0xFC00;   // amarillo
 constexpr uint16_t COL_PANEL_TXT   = 0x07E0;   // verde brillante panel
@@ -36,28 +37,39 @@ void dibujarBaseSonar(TFT_eSprite& s, int radioKm) {
   s.fillSprite(COL_FONDO);
   const int cx = RADAR_LADO / 2;
   const int cy = RADAR_LADO / 2;
-  const int rMax = RADAR_LADO / 2 - 10;
+  const int rMax = RADAR_LADO / 2 - 12;
   s.setTextFont(1);
-  // círculos concéntricos con etiqueta de radio
+  // Círculos internos verde medio
   s.setTextColor(COL_GRID_TXT);
-  for (int i = 1; i <= 5; ++i) {
+  for (int i = 1; i <= 4; ++i) {
     int r = rMax * i / 5;
     s.drawCircle(cx, cy, r, COL_GRID);
-    if (i < 5) {
-      char buf[8];
-      std::snprintf(buf, sizeof(buf), "%dkm", (radioKm * i + 4) / 5);
-      s.drawString(buf, cx + 2, cy - r - 8);
-    }
+    char buf[8];
+    std::snprintf(buf, sizeof(buf), "%dkm", (radioKm * i + 4) / 5);
+    s.drawString(buf, cx + 2, cy - r - 8);
   }
-  // ejes N/S/E/W
+  // Círculo exterior más brillante (borde del sonar)
+  s.drawCircle(cx, cy, rMax,     COL_GRID_BORDE);
+  s.drawCircle(cx, cy, rMax - 1, COL_GRID_BORDE);
+  // Ejes N/S/E/W
   s.drawFastVLine(cx, cy - rMax, 2 * rMax, COL_EJE);
   s.drawFastHLine(cx - rMax, cy, 2 * rMax, COL_EJE);
+  // Marcas de grado cada 30° en el borde (radios pequeños)
+  for (int deg = 0; deg < 360; deg += 30) {
+    double a = (deg - 90) * M_PI / 180.0;
+    int x1 = cx + int((rMax - 6) * std::cos(a));
+    int y1 = cy + int((rMax - 6) * std::sin(a));
+    int x2 = cx + int(rMax       * std::cos(a));
+    int y2 = cy + int(rMax       * std::sin(a));
+    s.drawLine(x1, y1, x2, y2, COL_GRID_BORDE);
+  }
+  // Etiquetas cardinales grandes
   s.setTextColor(COL_CARDINAL);
-  s.drawString("N", cx - 4,       cy - rMax - 10);
-  s.drawString("S", cx - 4,       cy + rMax + 2);
+  s.drawString("N", cx - 4,        cy - rMax - 10);
+  s.drawString("S", cx - 4,        cy + rMax + 2);
   s.drawString("E", cx + rMax + 2, cy - 4);
   s.drawString("O", cx - rMax - 10, cy - 4);
-  // punto central (posición del observador)
+  // Punto central (observador)
   s.fillCircle(cx, cy, 3, COL_CENTRO);
 }
 
@@ -80,14 +92,38 @@ void dibujarBarrido(TFT_eSprite& s, int angDeg) {
   }
 }
 
-// Un avión como punto sobre el sonar. Se resalta si:
-//   - dist_km < 3 (rojo, "encima")
-//   - el barrido acaba de pasar por él (verde brillante)
+// Silueta de avión (cruz avión-vista-cenital) orientada según trackDeg.
+// trackDeg: 0 = norte, 90 = este.
+void dibujarIconoAvion(TFT_eSprite& s, int x, int y, int trackDeg, uint16_t color) {
+  const double rad = (trackDeg - 90) * M_PI / 180.0;
+  const double c = std::cos(rad);
+  const double sn = std::sin(rad);
+  auto rot = [&](int px, int py, int& xr, int& yr) {
+    xr = x + int(px * c - py * sn);
+    yr = y + int(px * sn + py * c);
+  };
+  int x1, y1, x2, y2;
+  // Fuselaje (largo hacia el frente)
+  rot(-4, 0, x1, y1);
+  rot(5, 0, x2, y2);
+  s.drawLine(x1, y1, x2, y2, color);
+  // Alas
+  rot(0, -4, x1, y1);
+  rot(0, 4, x2, y2);
+  s.drawLine(x1, y1, x2, y2, color);
+  // Cola (estabilizador vertical más pequeño, atrás)
+  rot(-4, -2, x1, y1);
+  rot(-4, 2, x2, y2);
+  s.drawLine(x1, y1, x2, y2, color);
+}
+
+// Un avión sobre el sonar: silueta orientada según su rumbo + tag SIEMPRE visible.
+// Se realza cuando el barrido acaba de pasar por él, y se pinta en rojo si dist<3km.
 void dibujarAvionSonar(TFT_eSprite& s, const Aeronave& a, int radioKm, int angBarrido) {
   if (a.dist_km > radioKm) return;
   const int cx = RADAR_LADO / 2;
   const int cy = RADAR_LADO / 2;
-  const int rMax = RADAR_LADO / 2 - 10;
+  const int rMax = RADAR_LADO / 2 - 12;
 
   const double r = (a.dist_km / radioKm) * rMax;
   const double rad = (a.bearing - 90) * M_PI / 180.0;
@@ -95,32 +131,27 @@ void dibujarAvionSonar(TFT_eSprite& s, const Aeronave& a, int radioKm, int angBa
   const int y = cy + int(r * std::sin(rad));
 
   const bool encima = (a.dist_km < 3.0);
-  // Diferencia angular signed entre barrido y avión (0..360)
   int diff = ((angBarrido - a.bearing) % 360 + 360) % 360;
-  // "Iluminación" del barrido: recientemente pasado sobre el avión
   const bool iluminado = (diff < 40);
 
-  uint16_t color;
-  int radioPunto;
+  uint16_t colorIcono, colorTag;
   if (encima) {
-    color = COL_ENCIMA;
-    radioPunto = 4;
+    colorIcono = COL_ENCIMA;
+    colorTag   = COL_ENCIMA;
   } else if (iluminado) {
-    color = COL_AVION_HIT;
-    radioPunto = 3;
+    colorIcono = COL_AVION_HIT;
+    colorTag   = COL_AVION_HIT;
   } else {
-    color = COL_AVION_LEJOS;
-    radioPunto = 2;
+    colorIcono = COL_AVION_TENUE;
+    colorTag   = COL_AVION_TAG;
   }
-  s.fillCircle(x, y, radioPunto, color);
+  dibujarIconoAvion(s, x, y, a.track_deg, colorIcono);
 
-  // Etiqueta con callsign (solo si está iluminado o encima, si no se satura)
-  if (iluminado || encima) {
-    const std::string& etiq = a.callsign.empty() ? a.hex : a.callsign;
-    s.setTextColor(color);
-    s.setTextFont(1);
-    s.drawString(etiq.c_str(), x + 6, y - 6);
-  }
+  // Tag: callsign SIEMPRE visible al lado del avión
+  const std::string& etiq = a.callsign.empty() ? a.hex : a.callsign;
+  s.setTextColor(colorTag);
+  s.setTextFont(1);
+  s.drawString(etiq.c_str(), x + 7, y - 6);
 }
 
 // Panel derecho: nº aviones + destacado del más cercano (callsign, distancia,
@@ -270,7 +301,7 @@ void DisplayRadar::pintarPortalQR(const std::string& ssidAp, const std::string& 
   s_tft.setTextFont(2);
   s_tft.setCursor(px, 32);
   s_tft.print("1. WiFi:");
-  s_tft.setTextColor(COL_AVION, COL_FONDO);
+  s_tft.setTextColor(COL_AVION_HIT, COL_FONDO);
   s_tft.setTextFont(1);
   s_tft.setCursor(px, 54);
   s_tft.print(ssidAp.c_str());
