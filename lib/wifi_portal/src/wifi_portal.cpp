@@ -6,6 +6,8 @@
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
@@ -15,6 +17,39 @@ String macSufijo() {
   char buf[5];
   snprintf(buf, sizeof(buf), "%02X%02X", mac[4], mac[5]);
   return String(buf);
+}
+
+// Cache del último scan y flag para pedir rescan desde otro thread.
+// WiFi.scanNetworks(sync) NO puede llamarse desde el handler de AsyncWebServer
+// porque bloquea el thread async_tcp > 5 s y dispara el Task Watchdog.
+String s_scanCache = "[]";
+volatile bool s_pedirScan = true;
+
+void tareaScanPortal(void*) {
+  for (;;) {
+    if (s_pedirScan) {
+      s_pedirScan = false;
+      Serial.println("[scan] ejecutando WiFi.scanNetworks()...");
+      int n = WiFi.scanNetworks(false, false);
+      Serial.printf("[scan] devolvió %d redes\n", n);
+      JsonDocument doc;
+      JsonArray arr = doc.to<JsonArray>();
+      for (int i = 0; i < n && i < 32; ++i) {
+        String ssid = WiFi.SSID(i);
+        if (ssid.length() == 0) continue;
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = ssid;
+        o["rssi"] = WiFi.RSSI(i);
+        o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+      }
+      WiFi.scanDelete();
+      String out;
+      serializeJson(doc, out);
+      s_scanCache = out;
+      Serial.printf("[scan] cache actualizado (%u bytes)\n", (unsigned)out.length());
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
 }
 
 }  // namespace
@@ -29,25 +64,19 @@ void WifiPortal::ejecutar(IHttpClient& http) {
   Serial.printf("[portal] AP levantado: %s  IP: %s\n",
                 ssidAp.c_str(), WiFi.softAPIP().toString().c_str());
 
-  static AsyncWebServer server(80);
-  server.serveStatic("/", LittleFS, "/").setDefaultFile("portal.html");
+  // Task dedicada de scan en core 1 (fuera del thread async_tcp).
+  xTaskCreatePinnedToCore(tareaScanPortal, "scan", 4096, nullptr, 1, nullptr, 1);
 
+  static AsyncWebServer server(80);
+
+  // IMPORTANTE: registrar las rutas específicas ANTES del serveStatic catch-all,
+  // si no /api/scan se resuelve como fichero estático y falla con 404.
   server.on("/api/scan", HTTP_GET, [](AsyncWebServerRequest* req) {
-    int n = WiFi.scanNetworks(/*async=*/false, /*show_hidden=*/false);
-    JsonDocument doc;
-    JsonArray arr = doc.to<JsonArray>();
-    for (int i = 0; i < n; ++i) {
-      String ssid = WiFi.SSID(i);
-      if (ssid.length() == 0) continue;
-      JsonObject o = arr.add<JsonObject>();
-      o["ssid"] = ssid;
-      o["rssi"] = WiFi.RSSI(i);
-      o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
-    }
-    WiFi.scanDelete();
-    String out;
-    serializeJson(doc, out);
-    req->send(200, "application/json", out);
+    req->send(200, "application/json", s_scanCache);
+  });
+  server.on("/api/rescan", HTTP_POST, [](AsyncWebServerRequest* req) {
+    s_pedirScan = true;
+    req->send(200, "text/plain", "OK");
   });
 
   server.on("/api/save", HTTP_POST,
@@ -106,6 +135,9 @@ void WifiPortal::ejecutar(IHttpClient& http) {
       delay(500);
       ESP.restart();
     });
+
+  // serveStatic va DESPUÉS de las rutas específicas para no eclipsarlas.
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("portal.html");
 
   server.begin();
   Serial.println("[portal] esperando configuración...");

@@ -1,9 +1,12 @@
 #include "web_server.h"
 #include "geocoder.h"
 #include <Arduino.h>
+#include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
@@ -11,6 +14,38 @@ AsyncWebServer server(80);
 Config          s_cfg;
 RadarState*     s_estado = nullptr;
 IHttpClient*    s_http = nullptr;
+
+// Cache del scan de redes vecinas para /config. Igual que en el portal:
+// scanNetworks(sync) no puede correr en el thread async_tcp del AsyncWebServer.
+String s_scanCache = "[]";
+volatile bool s_pedirScan = false;
+
+void tareaScanWeb(void*) {
+  for (;;) {
+    if (s_pedirScan) {
+      s_pedirScan = false;
+      Serial.println("[web-scan] ejecutando WiFi.scanNetworks()...");
+      int n = WiFi.scanNetworks(false, false);
+      Serial.printf("[web-scan] devolvió %d redes\n", n);
+      JsonDocument doc;
+      JsonArray arr = doc.to<JsonArray>();
+      for (int i = 0; i < n && i < 32; ++i) {
+        String ssid = WiFi.SSID(i);
+        if (ssid.length() == 0) continue;
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = ssid;
+        o["rssi"] = WiFi.RSSI(i);
+        o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+      }
+      WiFi.scanDelete();
+      String out;
+      serializeJson(doc, out);
+      s_scanCache = out;
+      Serial.printf("[web-scan] cache actualizado (%u bytes)\n", (unsigned)out.length());
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+}
 
 void handleAircraft(AsyncWebServerRequest* req) {
   Snapshot snap = s_estado->snapshot();
@@ -98,21 +133,12 @@ void handleReset(AsyncWebServerRequest* req) {
 }
 
 void handleScan(AsyncWebServerRequest* req) {
-  int n = WiFi.scanNetworks(/*async=*/false, /*show_hidden=*/false);
-  JsonDocument doc;
-  JsonArray arr = doc.to<JsonArray>();
-  for (int i = 0; i < n; ++i) {
-    String ssid = WiFi.SSID(i);
-    if (ssid.length() == 0) continue;
-    JsonObject o = arr.add<JsonObject>();
-    o["ssid"] = ssid;
-    o["rssi"] = WiFi.RSSI(i);
-    o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
-  }
-  WiFi.scanDelete();
-  String out;
-  serializeJson(doc, out);
-  req->send(200, "application/json", out);
+  req->send(200, "application/json", s_scanCache);
+}
+
+void handleRescan(AsyncWebServerRequest* req) {
+  s_pedirScan = true;
+  req->send(200, "text/plain", "OK");
 }
 
 }  // namespace
@@ -122,7 +148,11 @@ void RadarWebServer::iniciar(const Config& cfg, RadarState& estado, IHttpClient&
   s_estado = &estado;
   s_http = &http;
 
-  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+  // Task de scan en core 1. Se dispara con /api/rescan; scanNetworks(sync)
+  // no puede correr en el thread async_tcp del AsyncWebServer sin romper WDT.
+  xTaskCreatePinnedToCore(tareaScanWeb, "webscan", 4096, nullptr, 1, nullptr, 1);
+
+  // IMPORTANTE: rutas específicas primero, serveStatic al final.
   server.on("/config", HTTP_GET, [](AsyncWebServerRequest* req) {
     req->send(LittleFS, "/config.html", "text/html");
   });
@@ -132,6 +162,8 @@ void RadarWebServer::iniciar(const Config& cfg, RadarState& estado, IHttpClient&
             [](AsyncWebServerRequest*) {}, nullptr, handleConfigPost);
   server.on("/api/reset",    HTTP_POST, handleReset);
   server.on("/api/scan",     HTTP_GET, handleScan);
+  server.on("/api/rescan",   HTTP_POST, handleRescan);
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.begin();
   Serial.println("[web] servidor iniciado");
 }

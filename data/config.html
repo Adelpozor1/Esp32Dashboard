@@ -37,10 +37,16 @@
     async function escanear() {
       const sel = document.getElementById('ssid-select');
       if (!sel) return;
-      sel.innerHTML = '<option value="">Buscando redes...</option>';
+      sel.innerHTML = '<option value="">Buscando redes (unos segundos)...</option>';
       try {
-        const r = await fetch('/api/scan');
-        const redes = await r.json();
+        await fetch('/api/rescan', {method: 'POST'});
+        let redes = [];
+        for (let i = 0; i < 8; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          const r = await fetch('/api/scan');
+          redes = await r.json();
+          if (redes.length) break;
+        }
         if (!redes.length) {
           sel.innerHTML = '<option value="">(ninguna red detectada)</option>';
           return;
