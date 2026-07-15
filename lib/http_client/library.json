@@ -1,0 +1,20 @@
+{
+  "name": "http_client",
+  "version": "0.1.0",
+  "description": "Interfaz IHttpClient para abstraer GETs HTTP (real en placa, mock en tests)",
+  "keywords": [
+    "http",
+    "client",
+    "interface",
+    "mock"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
