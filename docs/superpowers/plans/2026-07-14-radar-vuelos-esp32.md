@@ -12,6 +12,19 @@
 
 ---
 
+## Corrección de convención (post-Task 1)
+
+Durante Task 1 se descubrió que el layout `src/` con `main.cpp` incluyendo `Arduino.h` rompe la compilación del entorno `native` (`main.cpp` se arrastra y falla por dependencias de Arduino). La convención efectiva para módulos testeables es:
+
+- **Cada módulo va en `lib/<nombre>/src/`** (patrón idiomático PlatformIO — el LDF lo descubre automáticamente en cualquier env).
+- Los includes siguen siendo `#include "modulo.h"` sin cambios (el LDF resuelve rutas).
+- `main.cpp` se queda en `src/` (solo se compila para `esp32dev`).
+- **ArduinoFake se descarta** — no compila con clang moderno de macOS y ninguno de los tests lo usa realmente (todos con `std::string`/`std::vector` puros).
+
+**Aplicar a partir de Task 2:** cada vez que el plan diga `src/<modulo>.{h,cpp}`, leer como `lib/<modulo>/src/<modulo>.{h,cpp}`. Excepción: `src/main.cpp` (se queda donde está).
+
+---
+
 ## Estructura de archivos
 
 **Archivos a crear:**

@@ -2,7 +2,7 @@
 #include "geo_math.h"
 #include <cmath>
 
-// Madrid (Puerta del Sol) → Barcelona (Sagrada Familia): ~505 km, bearing ~62°
+// Madrid (Puerta del Sol) → Barcelona (Sagrada Familia): ~505 km, bearing ~75.6°
 constexpr double MAD_LAT = 40.4168;
 constexpr double MAD_LON = -3.7038;
 constexpr double BCN_LAT = 41.4036;
