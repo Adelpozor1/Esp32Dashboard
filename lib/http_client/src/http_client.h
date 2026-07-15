@@ -13,3 +13,16 @@ class IHttpClient {
                    int& statusOut,
                    int timeoutMs = 5000) = 0;
 };
+
+// -----------------------------------------------------------------------------
+// Implementación real usando WiFiClientSecure / HTTPClient (Arduino ESP32)
+// -----------------------------------------------------------------------------
+#ifdef ARDUINO
+class WifiHttpClient : public IHttpClient {
+ public:
+  bool get(const std::string& url,
+           std::string& bodyOut,
+           int& statusOut,
+           int timeoutMs = 5000) override;
+};
+#endif
