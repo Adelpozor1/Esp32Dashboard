@@ -1,5 +1,6 @@
 #include "display_radar.h"
 #include <TFT_eSPI.h>
+#include <qrcode.h>
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -138,6 +139,71 @@ void DisplayRadar::pintarMensaje(const std::string& titulo, const std::string& d
   s_tft.setTextFont(2);
   s_tft.setCursor(10, 110);
   s_tft.print(detalle.c_str());
+}
+
+void DisplayRadar::pintarPortalQR(const std::string& ssidAp, const std::string& url) {
+  if (!s_iniciado) return;
+  s_tft.fillScreen(COL_FONDO);
+
+  // Título
+  s_tft.setTextColor(COL_CARDINAL, COL_FONDO);
+  s_tft.setTextFont(2);
+  s_tft.setCursor(6, 4);
+  s_tft.print("Modo Portal");
+
+  // Generar QR versión 3 (29x29 módulos), ECC_LOW → cabe una URL corta con margen.
+  QRCode qr;
+  constexpr uint8_t QR_VERSION = 3;
+  uint8_t buffer[qrcode_getBufferSize(QR_VERSION)];
+  qrcode_initText(&qr, buffer, QR_VERSION, ECC_LOW, url.c_str());
+
+  // Escala 6 → 29*6 = 174 px; centrado en el cuadrante izquierdo (0..240).
+  constexpr int ESCALA = 6;
+  const int lado = qr.size * ESCALA;
+  const int qrX = (RADAR_LADO - lado) / 2;   // 33
+  const int qrY = 26;
+  // Fondo blanco alrededor del QR (quiet zone y contraste con fondo negro).
+  const int margen = 6;
+  s_tft.fillRect(qrX - margen, qrY - margen,
+                 lado + 2 * margen, lado + 2 * margen, TFT_WHITE);
+  for (int y = 0; y < qr.size; ++y) {
+    for (int x = 0; x < qr.size; ++x) {
+      if (qrcode_getModule(&qr, x, y)) {
+        s_tft.fillRect(qrX + x * ESCALA, qrY + y * ESCALA,
+                       ESCALA, ESCALA, TFT_BLACK);
+      }
+    }
+  }
+  // URL debajo del QR
+  s_tft.setTextColor(COL_ETIQUETA, COL_FONDO);
+  s_tft.setTextFont(1);
+  s_tft.setCursor(6, qrY + lado + margen + 6);
+  s_tft.print(url.c_str());
+
+  // Panel derecho: instrucciones
+  const int px = PANEL_X + 4;
+  s_tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
+  s_tft.setTextFont(2);
+  s_tft.setCursor(px, 32);
+  s_tft.print("1. WiFi:");
+  s_tft.setTextColor(COL_AVION, COL_FONDO);
+  s_tft.setTextFont(1);
+  s_tft.setCursor(px, 54);
+  s_tft.print(ssidAp.c_str());
+
+  s_tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
+  s_tft.setTextFont(2);
+  s_tft.setCursor(px, 78);
+  s_tft.print("2. Escanea");
+  s_tft.setCursor(px, 96);
+  s_tft.print("   el QR");
+
+  s_tft.setTextColor(COL_ETIQUETA, COL_FONDO);
+  s_tft.setTextFont(1);
+  s_tft.setCursor(px, 124);
+  s_tft.print("o abre la");
+  s_tft.setCursor(px, 136);
+  s_tft.print("URL a mano");
 }
 
 void DisplayRadar::pintarRadar(const Snapshot& snap) {

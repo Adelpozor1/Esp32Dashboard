@@ -116,15 +116,13 @@ void setup() {
     Serial.println("[cfg] no hay config, entrando en portal");
   }
 
-  // Modo Portal: mostrar en pantalla instrucciones antes de bloquear en el AP.
+  // Modo Portal: pintar QR con la URL del portal + instrucciones con el SSID.
   uint8_t mac[6];
   WiFi.macAddress(mac);
   char sufijo[5];
   snprintf(sufijo, sizeof(sufijo), "%02X%02X", mac[4], mac[5]);
   std::string ap = std::string("RadarVuelos-") + sufijo;
-  DisplayRadar::pintarMensaje("Modo Portal",
-                              std::string("Conecta al WiFi ") + ap +
-                              " y abre 192.168.4.1");
+  DisplayRadar::pintarPortalQR(ap, "http://192.168.4.1/");
   WifiPortal::ejecutar(g_http);   // no retorna
 }
 
