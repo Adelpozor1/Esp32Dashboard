@@ -21,8 +21,10 @@ bool AdsbClient::fetchCerca(double lat, double lon, int radioKm,
   out.clear();
 
   char url[192];
+  // HTTP puro (sin TLS): WiFiClientSecure.setInsecure() falla el handshake
+  // en la ESP32 con este endpoint. api.adsb.lol acepta HTTP sin redirect.
   std::snprintf(url, sizeof(url),
-                "https://api.adsb.lol/v2/point/%.6f/%.6f/%d",
+                "http://api.adsb.lol/v2/point/%.6f/%.6f/%d",
                 lat, lon, radioKm);
 
   std::string body;

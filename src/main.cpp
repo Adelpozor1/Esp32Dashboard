@@ -56,9 +56,11 @@ void tareaPoller(void*) {
       ok = cliente.fetchCerca(g_cfg.lat, g_cfg.lon, g_cfg.radio_km, aviones);
     }
     if (ok) {
+      Serial.printf("[poll] %d aviones\n", (int)aviones.size());
       g_estado->actualizar(aviones, millis());
       StatusLed::setEstado(EstadoLed::RADAR_OK);
     } else {
+      Serial.println("[poll] fetch falló, snapshot marcado stale");
       g_estado->marcarStale();
       StatusLed::setEstado(EstadoLed::RADAR_ERROR);
     }
