@@ -18,16 +18,16 @@ constexpr int RADAR_LADO     = 240;         // cuadrado a la izquierda
 constexpr int PANEL_X        = RADAR_LADO;  // panel info empieza aquí
 constexpr int PANEL_ANCHO    = PANTALLA_ANCHO - RADAR_LADO;
 
-// Paleta sonar clásico (RGB565) — verde fosforito sobre negro, bien marcado.
+// Paleta sonar clásico (RGB565) — verde fosforito sobre negro, alto contraste.
 constexpr uint16_t COL_FONDO       = 0x0000;   // negro
-constexpr uint16_t COL_GRID        = 0x0540;   // círculos internos, verde medio
-constexpr uint16_t COL_GRID_BORDE  = 0x07C0;   // círculo exterior, verde brillante
-constexpr uint16_t COL_EJE         = 0x0620;   // ejes NSEW bien marcados
-constexpr uint16_t COL_GRID_TXT    = 0x06C0;   // etiquetas radio y grados
-constexpr uint16_t COL_CARDINAL    = 0x07E0;   // N/S/E/W verde máximo
+constexpr uint16_t COL_GRID        = 0x07E0;   // círculos internos VERDE MAX
+constexpr uint16_t COL_GRID_BORDE  = 0x07E0;   // círculo exterior VERDE MAX
+constexpr uint16_t COL_EJE         = 0x07E0;   // ejes NSEW VERDE MAX
+constexpr uint16_t COL_GRID_TXT    = 0x07E0;   // etiquetas radio y grados
+constexpr uint16_t COL_CARDINAL    = 0x07E0;   // N/S/E/W VERDE MAX
 constexpr uint16_t COL_CENTRO      = 0xFC00;   // amarillo (observador)
-constexpr uint16_t COL_AVION_TENUE = 0x0400;   // avión no iluminado por barrido
-constexpr uint16_t COL_AVION_TAG   = 0x0580;   // etiqueta callsign no iluminada
+constexpr uint16_t COL_AVION_TENUE = 0x0500;   // avión no iluminado por barrido
+constexpr uint16_t COL_AVION_TAG   = 0x0680;   // etiqueta callsign no iluminada
 constexpr uint16_t COL_AVION_HIT   = 0x07E0;   // avión iluminado por el barrido
 constexpr uint16_t COL_ENCIMA      = 0xF800;   // rojo cuando dist<3km
 constexpr uint16_t COL_STALE       = 0xFC00;   // amarillo
