@@ -237,10 +237,15 @@ void DisplayRadar::iniciar() {
   // Backlight: en la CYD el BL va en GPIO 21, active-high
   pinMode(21, OUTPUT);
   digitalWrite(21, HIGH);
-  // Sprite offscreen para el área del radar (240x240, 16bpp = 115 KB en RAM)
-  s_sprite.setColorDepth(16);
-  s_sprite.createSprite(RADAR_LADO, RADAR_LADO);
-  s_sprite.fillSprite(COL_FONDO);
+  // Sprite offscreen para el área del radar en 8bpp (240x240 = 57 KB).
+  // 16bpp = 115 KB no cabe en el heap con WiFi+AsyncWebServer levantados.
+  s_sprite.setColorDepth(8);
+  void* p = s_sprite.createSprite(RADAR_LADO, RADAR_LADO);
+  Serial.printf("[display] createSprite %dx%d 8bpp → %s (heap libre: %u)\n",
+                RADAR_LADO, RADAR_LADO,
+                p ? "OK" : "FALLO",
+                (unsigned)ESP.getFreeHeap());
+  if (p) s_sprite.fillSprite(COL_FONDO);
   s_iniciado = true;
 }
 

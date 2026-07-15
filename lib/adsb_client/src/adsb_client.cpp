@@ -54,6 +54,10 @@ bool AdsbClient::fetchCerca(double lat, double lon, int radioKm,
     a.gs_kt     = static_cast<int>(obj["gs"] | 0.0);
     a.track_deg = static_cast<int>(obj["track"] | 0.0);
     a.dist_km   = geo::distanciaKm(lat, lon, a.lat, a.lon);
+    // ADSB.lol devuelve algunos aviones justo fuera del radio (usa geometría
+    // aproximada); descartamos los que caen fuera al recalcular con haversine
+    // para que el conteo coincida con lo que se ve en el sonar.
+    if (a.dist_km > radioKm) continue;
     a.bearing   = geo::bearingGrados(lat, lon, a.lat, a.lon);
     temp.push_back(std::move(a));
   }
