@@ -1,0 +1,21 @@
+{
+  "name": "geo_math",
+  "version": "0.1.0",
+  "description": "Cálculos geográficos: haversine (distancia) y bearing",
+  "keywords": [
+    "geo",
+    "haversine",
+    "distance",
+    "bearing",
+    "gps"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
