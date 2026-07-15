@@ -72,10 +72,14 @@ void tareaPoller(void*) {
 // El snapshot de aviones se lee siempre del último que hizo el poller.
 void tareaDisplay(void*) {
   int angBarrido = 0;
+  uint32_t frame = 0;
   for (;;) {
     Snapshot snap = g_estado->snapshot();
     DisplayRadar::pintarRadar(snap, angBarrido);
-    angBarrido = (angBarrido + 10) % 360;   // 10°/frame @ 200ms → vuelta cada 7.2 s
+    angBarrido = (angBarrido + 10) % 360;
+    if (++frame % 25 == 0) Serial.printf("[display] frame %u ang=%d aviones=%d\n",
+                                         (unsigned)frame, angBarrido,
+                                         (int)snap.aeronaves.size());
     vTaskDelay(pdMS_TO_TICKS(200));
   }
 }
