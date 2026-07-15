@@ -1,0 +1,21 @@
+{
+  "name": "radar_state",
+  "version": "0.1.0",
+  "description": "Wrapper thread-safe para Snapshot con mutex FreeRTOS (Arduino) y compatible con nativo",
+  "keywords": [
+    "radar",
+    "snapshot",
+    "thread-safe",
+    "mutex",
+    "freertos"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
