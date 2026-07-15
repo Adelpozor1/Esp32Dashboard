@@ -1,0 +1,21 @@
+{
+  "name": "config_store",
+  "version": "0.1.0",
+  "description": "Serialización binaria y persistencia en NVS para configuración del radar de vuelos",
+  "keywords": [
+    "config",
+    "nvs",
+    "preferences",
+    "serialization",
+    "persistencia"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
