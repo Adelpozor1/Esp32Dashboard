@@ -75,7 +75,7 @@
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();
       const msg = document.getElementById('msg');
-      msg.innerHTML = '<div class="msg-ok">Resolviendo dirección y guardando...</div>';
+      msg.innerHTML = '<div class="msg-ok">Conectando a tu WiFi y resolviendo la dirección... esto puede tardar 20-30 s.</div>';
       const data = Object.fromEntries(new FormData(e.target));
       const r = await fetch('/api/save', {
         method: 'POST',

@@ -68,6 +68,22 @@ void WifiPortal::ejecutar(IHttpClient& http) {
         req->send(400, "text/plain", "Campos obligatorios vacíos");
         return;
       }
+      // Antes de geocoding, conectar a la WiFi indicada — Nominatim
+      // requiere internet y en Modo Portal solo teníamos el AP levantado.
+      Serial.printf("[portal] conectando a %s para geocoding...\n", ssid.c_str());
+      WiFi.begin(ssid.c_str(), pass.c_str());
+      uint32_t inicio = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
+        delay(200);
+      }
+      if (WiFi.status() != WL_CONNECTED) {
+        req->send(400, "text/plain",
+                  "No se puede conectar a la WiFi indicada. Comprueba SSID y password.");
+        return;
+      }
+      Serial.printf("[portal] WiFi conectada, IP: %s\n",
+                    WiFi.localIP().toString().c_str());
+
       Geocoder g(http);
       double lat = 0, lon = 0;
       if (!g.resolver(dir, lat, lon)) {
