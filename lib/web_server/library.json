@@ -1,0 +1,21 @@
+{
+  "name": "web_server",
+  "version": "0.1.0",
+  "description": "Servidor HTTP para radar de vuelos en modo radar: API /aircraft, /config, /reset",
+  "keywords": [
+    "web",
+    "http",
+    "async",
+    "api",
+    "radar"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
