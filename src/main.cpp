@@ -68,12 +68,15 @@ void tareaPoller(void*) {
   }
 }
 
-// Task del display: cada 1 s toma snapshot y lo pinta en el TFT.
+// Task del display: refresca cada 200 ms para animar el barrido del sonar.
+// El snapshot de aviones se lee siempre del último que hizo el poller.
 void tareaDisplay(void*) {
+  int angBarrido = 0;
   for (;;) {
     Snapshot snap = g_estado->snapshot();
-    DisplayRadar::pintarRadar(snap);
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    DisplayRadar::pintarRadar(snap, angBarrido);
+    angBarrido = (angBarrido + 10) % 360;   // 10°/frame @ 200ms → vuelta cada 7.2 s
+    vTaskDelay(pdMS_TO_TICKS(200));
   }
 }
 
