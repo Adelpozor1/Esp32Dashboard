@@ -1,0 +1,21 @@
+{
+  "name": "status_led",
+  "version": "0.1.0",
+  "description": "LED de estado con FreeRTOS task y 4 patrones (portal, conectando WiFi, radar OK, error)",
+  "keywords": [
+    "led",
+    "status",
+    "freertos",
+    "task",
+    "blink"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
