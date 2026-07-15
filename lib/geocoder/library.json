@@ -1,0 +1,21 @@
+{
+  "name": "geocoder",
+  "version": "0.1.0",
+  "description": "Resolución de direcciones a coordenadas usando Nominatim (OpenStreetMap)",
+  "keywords": [
+    "geocoding",
+    "nominatim",
+    "openstreetmap",
+    "coordinates",
+    "direcciones"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
