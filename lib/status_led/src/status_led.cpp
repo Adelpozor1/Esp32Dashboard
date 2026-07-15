@@ -6,8 +6,14 @@
 namespace {
 
 int             s_pin = 2;
+bool            s_activoBajo = false;
 EstadoLed       s_estado = EstadoLed::PORTAL;
 TaskHandle_t    s_task = nullptr;
+
+void encender(bool on) {
+  int nivel = on ? (s_activoBajo ? LOW : HIGH) : (s_activoBajo ? HIGH : LOW);
+  digitalWrite(s_pin, nivel);
+}
 
 void tareaLed(void*) {
   bool encendido = false;
@@ -16,26 +22,26 @@ void tareaLed(void*) {
     switch (s_estado) {
       case EstadoLed::PORTAL:
         encendido = !encendido;
-        digitalWrite(s_pin, encendido ? HIGH : LOW);
+        encender(encendido);
         vTaskDelay(pdMS_TO_TICKS(500));  // 1 Hz
         break;
       case EstadoLed::CONECTANDO_WIFI:
         encendido = !encendido;
-        digitalWrite(s_pin, encendido ? HIGH : LOW);
+        encender(encendido);
         vTaskDelay(pdMS_TO_TICKS(100));  // 5 Hz
         break;
       case EstadoLed::RADAR_OK:
-        digitalWrite(s_pin, HIGH);
+        encender(true);
         vTaskDelay(pdMS_TO_TICKS(200));
         break;
       case EstadoLed::RADAR_ERROR:
         // encendido, con corte de 2 s cada 60 s
         if (contadorMs >= 60000) {
-          digitalWrite(s_pin, LOW);
+          encender(false);
           vTaskDelay(pdMS_TO_TICKS(2000));
           contadorMs = 0;
         } else {
-          digitalWrite(s_pin, HIGH);
+          encender(true);
           vTaskDelay(pdMS_TO_TICKS(200));
           contadorMs += 200;
         }
@@ -46,10 +52,11 @@ void tareaLed(void*) {
 
 }  // namespace
 
-void StatusLed::iniciar(int pin) {
+void StatusLed::iniciar(int pin, bool activoBajo) {
   s_pin = pin;
+  s_activoBajo = activoBajo;
   pinMode(s_pin, OUTPUT);
-  digitalWrite(s_pin, LOW);
+  encender(false);
   if (!s_task) {
     xTaskCreatePinnedToCore(tareaLed, "led", 2048, nullptr, 1, &s_task, 1);
   }

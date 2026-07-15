@@ -11,6 +11,7 @@
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "status_led.h"
+#include "display_radar.h"
 
 namespace {
 
@@ -19,9 +20,9 @@ WifiHttpClient  g_http;
 Config          g_cfg;
 uint32_t        g_ultimoIntentoWifiMs = 0;
 
-// Conecta al WiFi guardado. Devuelve true si conecta en <= 20 s.
 bool conectarWifi() {
   StatusLed::setEstado(EstadoLed::CONECTANDO_WIFI);
+  DisplayRadar::pintarMensaje("Conectando WiFi", g_cfg.ssid);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   WiFi.begin(g_cfg.ssid.c_str(), g_cfg.password.c_str());
@@ -38,7 +39,6 @@ bool conectarWifi() {
 void tareaPoller(void*) {
   AdsbClient cliente(g_http);
   for (;;) {
-    // Watchdog implícito: si el fetch se cuelga > 15 s se dispara el TWDT (activo por defecto).
     if (WiFi.status() != WL_CONNECTED) {
       g_estado->marcarStale();
       StatusLed::setEstado(EstadoLed::RADAR_ERROR);
@@ -53,7 +53,6 @@ void tareaPoller(void*) {
     std::vector<Aeronave> aviones;
     bool ok = cliente.fetchCerca(g_cfg.lat, g_cfg.lon, g_cfg.radio_km, aviones);
     if (!ok) {
-      // 1 reintento inmediato
       ok = cliente.fetchCerca(g_cfg.lat, g_cfg.lon, g_cfg.radio_km, aviones);
     }
     if (ok) {
@@ -67,10 +66,20 @@ void tareaPoller(void*) {
   }
 }
 
+// Task del display: cada 1 s toma snapshot y lo pinta en el TFT.
+void tareaDisplay(void*) {
+  for (;;) {
+    Snapshot snap = g_estado->snapshot();
+    DisplayRadar::pintarRadar(snap);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
 void modoRadar() {
   g_estado = new RadarState(g_cfg.lat, g_cfg.lon, g_cfg.radio_km);
   RadarWebServer::iniciar(g_cfg, *g_estado, g_http);
-  xTaskCreatePinnedToCore(tareaPoller, "poller", 8192, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaPoller,  "poller",  8192, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaDisplay, "display", 4096, nullptr, 1, nullptr, 1);
   Serial.println("[radar] modo operativo");
 }
 
@@ -81,11 +90,17 @@ void setup() {
   delay(200);
   Serial.println("\n===== Radar de vuelos ESP32 =====");
 
+  // Arrancar display antes de cualquier feedback visual
+  DisplayRadar::iniciar();
+  DisplayRadar::pintarMensaje("Radar de vuelos", "arrancando...");
+
   if (!LittleFS.begin(true)) {
     Serial.println("[fs] error montando LittleFS");
   }
 
-  StatusLed::iniciar(2);
+  // LED de estado en GPIO 4 (LED rojo del RGB integrado del ESP32-2432S028,
+  // active-low). GPIO 2 está reservado para el pin DC del display TFT.
+  StatusLed::iniciar(4, /*activoBajo=*/true);
 
   bool tieneCfg = ConfigStore::cargar(g_cfg);
   if (tieneCfg) {
@@ -100,10 +115,19 @@ void setup() {
   } else {
     Serial.println("[cfg] no hay config, entrando en portal");
   }
+
+  // Modo Portal: mostrar en pantalla instrucciones antes de bloquear en el AP.
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char sufijo[5];
+  snprintf(sufijo, sizeof(sufijo), "%02X%02X", mac[4], mac[5]);
+  std::string ap = std::string("RadarVuelos-") + sufijo;
+  DisplayRadar::pintarMensaje("Modo Portal",
+                              std::string("Conecta al WiFi ") + ap +
+                              " y abre 192.168.4.1");
   WifiPortal::ejecutar(g_http);   // no retorna
 }
 
 void loop() {
-  // Todo en tasks.
   delay(1000);
 }

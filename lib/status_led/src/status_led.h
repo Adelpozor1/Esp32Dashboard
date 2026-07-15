@@ -10,6 +10,9 @@ enum class EstadoLed {
 
 class StatusLed {
  public:
-  static void iniciar(int pin = 2);          // GPIO 2 = LED interno de la mayoría de ESP32 dev
+  // pin: GPIO donde vive el LED indicador.
+  // activoBajo: true si el LED se enciende con LOW (típico de LEDs integrados con
+  // ánodo común, como el LED RGB del ESP32-2432S028 CYD).
+  static void iniciar(int pin = 2, bool activoBajo = false);
   static void setEstado(EstadoLed nuevo);
 };
