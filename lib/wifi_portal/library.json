@@ -1,0 +1,22 @@
+{
+  "name": "wifi_portal",
+  "version": "0.1.0",
+  "description": "Portal WiFi (AP + formulario + geocoding + guardado en NVS)",
+  "keywords": [
+    "wifi",
+    "portal",
+    "ap",
+    "access_point",
+    "geocoding",
+    "nvs"
+  ],
+  "authors": [
+    {
+      "name": "Alberto del Pozo",
+      "url": "https://tidehub.io"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
