@@ -100,12 +100,16 @@ build_flags =
   -DLOAD_FONT2=1
   -DLOAD_FONT4=1
   -DSPI_FREQUENCY=55000000
-  ; Panel táctil XPT2046 (bus SPI aparte del TFT en la CYD ESP32-2432S028R)
-  -DTOUCH_CS=33
-  -DTOUCH_CLK=25
-  -DTOUCH_MOSI=32
-  -DTOUCH_MISO=39
-  -DTOUCH_IRQ=36
+  ; Panel táctil XPT2046 (bus SPI aparte del TFT en la CYD ESP32-2432S028R).
+  ; Prefijo XPT_ (NO TOUCH_) para evitar activar la extensión Touch integrada de
+  ; TFT_eSPI: si se define TOUCH_CS, TFT_eSPI incluye su propio Extensions/Touch
+  ; y toma el pin en tft.init(); no queremos eso, el driver lo lleva la lib
+  ; XPT2046_Touchscreen con su propio SPI (HSPI).
+  -DXPT_CS=33
+  -DXPT_CLK=25
+  -DXPT_MOSI=32
+  -DXPT_MISO=39
+  -DXPT_IRQ=36
 ```
 
 - [ ] **Step 2: Compilar para verificar que la dep se resuelve**
@@ -1138,10 +1142,10 @@ void iniciar(const CalibracionTouch& cal) {
   s_cal = cal;
   if (s_spi == nullptr) {
     s_spi = new SPIClass(HSPI);
-    s_spi->begin(TOUCH_CLK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
+    s_spi->begin(XPT_CLK, XPT_MISO, XPT_MOSI, XPT_CS);
   }
   if (s_ts == nullptr) {
-    s_ts = new XPT2046_Touchscreen(TOUCH_CS, TOUCH_IRQ);
+    s_ts = new XPT2046_Touchscreen(XPT_CS, XPT_IRQ);
     s_ts->begin(*s_spi);
     s_ts->setRotation(1);
   }
