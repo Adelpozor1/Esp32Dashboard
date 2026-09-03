@@ -1,0 +1,9 @@
+{
+  "name": "qr_view",
+  "version": "0.1.0",
+  "description": "Helper para pintar QR sobre TFT_eSPI en el radar de vuelos",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43",
+    "ricmoo/QRCode": "^0.0.1"
+  }
+}
