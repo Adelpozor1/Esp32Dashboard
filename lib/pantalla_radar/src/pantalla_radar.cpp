@@ -3,13 +3,13 @@
 #include <TFT_eSPI.h>
 #include <cmath>
 #include <cstdio>
-#include <algorithm>
 
 namespace {
 constexpr int LADO_RADAR   = 220;   // sprite cuadrado dentro de 320x220
 constexpr int OFFSET_Y     = 20;    // barra superior de 20 px
 constexpr int PANEL_X      = LADO_RADAR;
 constexpr int PANEL_ANCHO  = 320 - LADO_RADAR;
+constexpr int PANEL_ALTO   = 240 - OFFSET_Y;   // altura útil del panel derecho (220 px)
 
 constexpr uint16_t COL_FONDO       = 0x0000;
 constexpr uint16_t COL_GRID        = 0x07E0;
@@ -59,7 +59,7 @@ void dibujarBaseSonar(TFT_eSprite& s, int radioKm) {
 
 void dibujarBarrido(TFT_eSprite& s, int angDeg) {
   const int cx = LADO_RADAR / 2, cy = LADO_RADAR / 2;
-  const int rMax = LADO_RADAR / 2 - 8;
+  const int rMax = LADO_RADAR / 2 - 10;   // igual que en dibujarBaseSonar
   static const uint16_t stele[10] = {
     0x07E0, 0x06E0, 0x05E0, 0x04E0, 0x0400,
     0x0340, 0x0280, 0x01C0, 0x0140, 0x00A0
@@ -107,7 +107,7 @@ void dibujarAvionSonar(TFT_eSprite& s, const Aeronave& a, int radioKm, int angBa
 }
 
 void pintarPanelSonar(TFT_eSPI& tft, const Snapshot& snap) {
-  tft.fillRect(PANEL_X, OFFSET_Y, PANEL_ANCHO, 220, COL_FONDO);
+  tft.fillRect(PANEL_X, OFFSET_Y, PANEL_ANCHO, PANEL_ALTO, COL_FONDO);
   char buf[24];
   tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
   tft.setTextFont(1);
@@ -124,37 +124,41 @@ void pintarPanelSonar(TFT_eSPI& tft, const Snapshot& snap) {
   if (!mc) {
     tft.setTextColor(COL_GRID_TXT, COL_FONDO);
     tft.setTextFont(2);
-    tft.setCursor(PANEL_X + 4, OFFSET_Y + 40);
+    tft.setCursor(PANEL_X + 4, OFFSET_Y + 36);
     tft.print("sin");
-    tft.setCursor(PANEL_X + 4, OFFSET_Y + 58);
+    tft.setCursor(PANEL_X + 4, OFFSET_Y + 54);
     tft.print("aviones");
     return;
   }
   const bool encima = (mc->dist_km < 3.0);
   const uint16_t col = encima ? COL_ENCIMA : COL_PANEL_TXT;
+  // Callsign
   tft.setTextColor(col, COL_FONDO);
   tft.setTextFont(2);
-  tft.setCursor(PANEL_X + 4, OFFSET_Y + 38);
+  tft.setCursor(PANEL_X + 4, OFFSET_Y + 34);
   tft.print((mc->callsign.empty() ? mc->hex : mc->callsign).c_str());
+  // Distancia (grande)
   tft.setTextFont(4);
-  tft.setCursor(PANEL_X + 4, OFFSET_Y + 62);
+  tft.setCursor(PANEL_X + 4, OFFSET_Y + 56);
   if (mc->dist_km < 10.0) std::snprintf(buf, sizeof(buf), "%.1f", mc->dist_km);
   else                    std::snprintf(buf, sizeof(buf), "%d", (int)mc->dist_km);
   tft.print(buf);
   tft.setTextFont(2);
-  tft.setCursor(PANEL_X + 4, OFFSET_Y + 96);
+  tft.setCursor(PANEL_X + 4, OFFSET_Y + 88);
   tft.print("km");
+  // Altitud y rumbo
   tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
   tft.setTextFont(2);
-  tft.setCursor(PANEL_X + 4, OFFSET_Y + 122);
+  tft.setCursor(PANEL_X + 4, OFFSET_Y + 112);
   std::snprintf(buf, sizeof(buf), "%dft", mc->alt_ft);
   tft.print(buf);
-  tft.setCursor(PANEL_X + 4, OFFSET_Y + 144);
+  tft.setCursor(PANEL_X + 4, OFFSET_Y + 132);
   std::snprintf(buf, sizeof(buf), "%d\xB0", mc->bearing);
   tft.print(buf);
+  // Alerta ENCIMA — bien despegada del borde inferior
   if (encima) {
     tft.setTextColor(COL_ENCIMA, COL_FONDO);
-    tft.setCursor(PANEL_X + 4, OFFSET_Y + 200);
+    tft.setCursor(PANEL_X + 4, OFFSET_Y + 180);
     tft.print("ENCIMA");
   }
 }
@@ -169,10 +173,18 @@ void PantallaRadar::alEntrar() {
   sprite_ = new TFT_eSprite(&tft_driver::obtenerTft());
   sprite_->setColorDepth(8);
   void* p = sprite_->createSprite(LADO_RADAR, LADO_RADAR);
+  // Requiere Serial.begin(...) previo (main.cpp lo hace en setup).
   Serial.printf("[radar] sprite %dx%d -> %s (heap %u)\n",
                 LADO_RADAR, LADO_RADAR, p ? "OK" : "FAIL",
                 (unsigned)ESP.getFreeHeap());
-  if (p) sprite_->fillSprite(COL_FONDO);
+  if (!p) {
+    // Sin heap para el bitmap: liberamos el objeto y dejamos sprite_ = nullptr
+    // para que dibujar() salga por su guardia y no pinte a hueco.
+    delete sprite_;
+    sprite_ = nullptr;
+    return;
+  }
+  sprite_->fillSprite(COL_FONDO);
 }
 
 void PantallaRadar::alSalir() {
