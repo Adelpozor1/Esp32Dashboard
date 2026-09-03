@@ -20,6 +20,7 @@
 #include "pantalla_radar.h"
 #include "pantalla_menu.h"
 #include "pantalla_proximamente.h"
+#include "pantalla_reloj.h"
 #include "pantalla_ajustes.h"
 #include "pantalla_intervalo.h"
 #include "pantalla_seleccion_vistas.h"
@@ -80,6 +81,10 @@ bool conectarWifi() {
   while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) delay(200);
   if (WiFi.status() != WL_CONNECTED) return false;
   Serial.printf("[wifi] conectado, IP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.println("[wifi] arrancando NTP + TZ Europe/Madrid");
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+  tzset();
   return true;
 }
 
@@ -149,7 +154,7 @@ void modoRadar() {
 
   // Construir pantallas.
   auto* radar   = new PantallaRadar(*g_estado);
-  auto* reloj   = new PantallaProximamente(1, "Reloj");
+  auto* reloj   = new PantallaReloj();
   auto* meteo   = new PantallaProximamente(2, "Meteo");
   auto* futbol  = new PantallaProximamente(3, "Futbol");
   auto* motogp  = new PantallaProximamente(4, "MotoGP");
