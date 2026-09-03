@@ -59,6 +59,43 @@ void test_swipe_muy_lento_no_produce_evento(void) {
   TEST_ASSERT_FALSE(ev.has_value());
 }
 
+void test_release_sin_press_devuelve_nullopt(void) {
+  GestureDetector g;
+  auto ev = g.onRelease(100, 100, 1000);
+  TEST_ASSERT_FALSE(ev.has_value());
+}
+
+void test_release_doble_consecutivo_devuelve_nullopt(void) {
+  GestureDetector g;
+  g.onPress(50, 50, 1000);
+  auto ev1 = g.onRelease(50, 50, 1100);
+  TEST_ASSERT_TRUE(ev1.has_value());
+  auto ev2 = g.onRelease(50, 50, 1200);  // sin nuevo press
+  TEST_ASSERT_FALSE(ev2.has_value());
+}
+
+void test_dead_zone_entre_tap_y_swipe(void) {
+  // dx=40 supera el umbral TAP (20 estricto) pero no llega al SWIPE (60 estricto):
+  // el detector debe devolver nullopt para no confundir dos gestos.
+  GestureDetector g;
+  g.onPress(50, 100, 1000);
+  auto ev = g.onRelease(90, 100, 1100);
+  TEST_ASSERT_FALSE(ev.has_value());
+}
+
+void test_bordes_exactos_de_umbral_son_estrictos(void) {
+  // dur=300 no es TAP (< estricto), |dx|=60 no es SWIPE (> estricto).
+  GestureDetector g1;
+  g1.onPress(50, 50, 1000);
+  auto ev1 = g1.onRelease(50, 50, 1300);   // dur exactamente 300 ms
+  TEST_ASSERT_FALSE(ev1.has_value());
+
+  GestureDetector g2;
+  g2.onPress(50, 100, 1000);
+  auto ev2 = g2.onRelease(110, 100, 1100);  // dx exactamente 60
+  TEST_ASSERT_FALSE(ev2.has_value());
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_tap_corto_produce_evento_tap);
@@ -68,5 +105,9 @@ int main(int, char**) {
   RUN_TEST(test_swipe_izquierda_produce_evento);
   RUN_TEST(test_swipe_vertical_no_produce_evento);
   RUN_TEST(test_swipe_muy_lento_no_produce_evento);
+  RUN_TEST(test_release_sin_press_devuelve_nullopt);
+  RUN_TEST(test_release_doble_consecutivo_devuelve_nullopt);
+  RUN_TEST(test_dead_zone_entre_tap_y_swipe);
+  RUN_TEST(test_bordes_exactos_de_umbral_son_estrictos);
   return UNITY_END();
 }
