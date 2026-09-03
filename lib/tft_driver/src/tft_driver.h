@@ -11,7 +11,7 @@ void iniciar();
 
 // Devuelve la instancia global de TFT_eSPI. Necesario porque TFT_eSPI ocupa
 // bastante RAM y no queremos duplicarla por pantalla.
-TFT_eSPI& getTft();
+TFT_eSPI& obtenerTft();
 
 // Pinta un splash centrado de dos líneas (título grande + detalle). Usado
 // antes de que exista GestorPantallas (splash de arranque, "conectando WiFi").

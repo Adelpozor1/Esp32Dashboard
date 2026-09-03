@@ -9,7 +9,11 @@
 
 namespace {
 
-TFT_eSprite    s_sprite(&tft_driver::getTft());  // buffer offscreen 240x240 para el área del radar
+// El ctor de TFT_eSprite sólo captura el puntero; el TFT_eSPI referenciado no
+// necesita estar construido aún — su dirección es estable desde el arranque.
+// Los métodos que dereferencian el TFT se llaman desde DisplayRadar::iniciar(),
+// que primero invoca tft_driver::iniciar() (garantía de estar construido).
+TFT_eSprite    s_sprite(&tft_driver::obtenerTft());  // buffer offscreen 240x240 para el área del radar
 bool           s_iniciado = false;
 
 // Layout landscape (rotation 1) → 320x240
@@ -158,19 +162,19 @@ void dibujarAvionSonar(TFT_eSprite& s, const Aeronave& a, int radioKm, int angBa
 // Panel derecho: nº aviones + destacado del más cercano (callsign, distancia,
 // altitud). Si dist<3km, alerta en rojo "!ENCIMA!".
 void pintarPanelSonar(const Snapshot& snap) {
-  tft_driver::getTft().fillRect(PANEL_X, 0, PANEL_ANCHO, PANTALLA_ALTO, COL_FONDO);
+  tft_driver::obtenerTft().fillRect(PANEL_X, 0, PANEL_ANCHO, PANTALLA_ALTO, COL_FONDO);
   char buf[24];
 
-  tft_driver::getTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
-  tft_driver::getTft().setTextFont(1);
-  tft_driver::getTft().setCursor(PANEL_X + 4, 4);
+  tft_driver::obtenerTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
+  tft_driver::obtenerTft().setTextFont(1);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 4);
   std::snprintf(buf, sizeof(buf), "%d aviones", (int)snap.aeronaves.size());
-  tft_driver::getTft().print(buf);
+  tft_driver::obtenerTft().print(buf);
 
   if (snap.stale) {
-    tft_driver::getTft().setTextColor(COL_STALE, COL_FONDO);
-    tft_driver::getTft().setCursor(PANEL_X + 4, 16);
-    tft_driver::getTft().print("stale");
+    tft_driver::obtenerTft().setTextColor(COL_STALE, COL_FONDO);
+    tft_driver::obtenerTft().setCursor(PANEL_X + 4, 16);
+    tft_driver::obtenerTft().print("stale");
   }
 
   // Encontrar el avión más cercano
@@ -179,12 +183,12 @@ void pintarPanelSonar(const Snapshot& snap) {
     if (!mc || a.dist_km < mc->dist_km) mc = &a;
   }
   if (!mc) {
-    tft_driver::getTft().setTextColor(COL_GRID_TXT, COL_FONDO);
-    tft_driver::getTft().setTextFont(2);
-    tft_driver::getTft().setCursor(PANEL_X + 4, 40);
-    tft_driver::getTft().print("sin");
-    tft_driver::getTft().setCursor(PANEL_X + 4, 58);
-    tft_driver::getTft().print("aviones");
+    tft_driver::obtenerTft().setTextColor(COL_GRID_TXT, COL_FONDO);
+    tft_driver::obtenerTft().setTextFont(2);
+    tft_driver::obtenerTft().setCursor(PANEL_X + 4, 40);
+    tft_driver::obtenerTft().print("sin");
+    tft_driver::obtenerTft().setCursor(PANEL_X + 4, 58);
+    tft_driver::obtenerTft().print("aviones");
     return;
   }
 
@@ -192,39 +196,39 @@ void pintarPanelSonar(const Snapshot& snap) {
   const uint16_t col = encima ? COL_ENCIMA : COL_PANEL_TXT;
 
   // Callsign en font 2
-  tft_driver::getTft().setTextColor(col, COL_FONDO);
-  tft_driver::getTft().setTextFont(2);
-  tft_driver::getTft().setCursor(PANEL_X + 4, 38);
-  tft_driver::getTft().print((mc->callsign.empty() ? mc->hex : mc->callsign).c_str());
+  tft_driver::obtenerTft().setTextColor(col, COL_FONDO);
+  tft_driver::obtenerTft().setTextFont(2);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 38);
+  tft_driver::obtenerTft().print((mc->callsign.empty() ? mc->hex : mc->callsign).c_str());
 
   // Distancia en font 4 (grande)
-  tft_driver::getTft().setTextFont(4);
-  tft_driver::getTft().setCursor(PANEL_X + 4, 62);
+  tft_driver::obtenerTft().setTextFont(4);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 62);
   if (mc->dist_km < 10.0) std::snprintf(buf, sizeof(buf), "%.1f", mc->dist_km);
   else                    std::snprintf(buf, sizeof(buf), "%d", (int)mc->dist_km);
-  tft_driver::getTft().print(buf);
-  tft_driver::getTft().setTextFont(2);
-  tft_driver::getTft().setCursor(PANEL_X + 4, 96);
-  tft_driver::getTft().print("km");
+  tft_driver::obtenerTft().print(buf);
+  tft_driver::obtenerTft().setTextFont(2);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 96);
+  tft_driver::obtenerTft().print("km");
 
   // Altitud
-  tft_driver::getTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
-  tft_driver::getTft().setTextFont(2);
-  tft_driver::getTft().setCursor(PANEL_X + 4, 122);
+  tft_driver::obtenerTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
+  tft_driver::obtenerTft().setTextFont(2);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 122);
   std::snprintf(buf, sizeof(buf), "%dft", mc->alt_ft);
-  tft_driver::getTft().print(buf);
+  tft_driver::obtenerTft().print(buf);
 
   // Rumbo
-  tft_driver::getTft().setCursor(PANEL_X + 4, 144);
+  tft_driver::obtenerTft().setCursor(PANEL_X + 4, 144);
   std::snprintf(buf, sizeof(buf), "%d\xB0", mc->bearing);
-  tft_driver::getTft().print(buf);
+  tft_driver::obtenerTft().print(buf);
 
   // Alerta
   if (encima) {
-    tft_driver::getTft().setTextColor(COL_ENCIMA, COL_FONDO);
-    tft_driver::getTft().setTextFont(2);
-    tft_driver::getTft().setCursor(PANEL_X + 4, 200);
-    tft_driver::getTft().print("ENCIMA");
+    tft_driver::obtenerTft().setTextColor(COL_ENCIMA, COL_FONDO);
+    tft_driver::obtenerTft().setTextFont(2);
+    tft_driver::obtenerTft().setCursor(PANEL_X + 4, 200);
+    tft_driver::obtenerTft().print("ENCIMA");
   }
 }
 
@@ -261,7 +265,7 @@ void DisplayRadar::pintarPortalQR(const std::string& ssidAp, const std::string& 
     "o abre la",
     "URL a mano",
   };
-  qr_view::pintarPortalConQR(tft_driver::getTft(), "Modo Portal", url, lineas);
+  qr_view::pintarPortalConQR(tft_driver::obtenerTft(), "Modo Portal", url, lineas);
 }
 
 void DisplayRadar::pintarRadar(const Snapshot& snap, int anguloBarridoDeg) {
