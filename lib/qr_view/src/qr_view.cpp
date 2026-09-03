@@ -47,28 +47,47 @@ void pintarPortalConQR(TFT_eSPI& tft,
                        const std::vector<std::string>& lineasPanel) {
   tft.fillScreen(COL_FONDO);
   tft.setTextColor(COL_TITULO, COL_FONDO);
+
+  if (url.size() > URL_MAX_CHARS) {
+    tft.setTextColor(0xF800, COL_FONDO);   // rojo
+    tft.setTextFont(2);
+    tft.setCursor(10, 40);
+    tft.print("URL demasiado larga");
+    tft.setCursor(10, 70);
+    tft.print("para el QR");
+    tft.setTextFont(1);
+    tft.setCursor(10, 110);
+    tft.print(url.c_str());
+    return;
+  }
+
   tft.setTextFont(2);
   tft.setCursor(6, 4);
   tft.print(titulo.c_str());
 
-  // Área izquierda: cuadrado 240x240. QR centrado con escala 6.
+  // Área izquierda: cuadrado 240x240. QR centrado.
   constexpr int LADO_IZQ = 240;
-  constexpr int ESCALA = 6;
-  // Estimación del tamaño para centrar (v2..v5 → 25..37 módulos).
-  const int version = (url.size() <= 32) ? 2 : (url.size() <= 53) ? 3 : (url.size() <= 78) ? 4 : 5;
-  const int tamModulos = 17 + version * 4;  // regla del QR
-  const int lado = tamModulos * ESCALA;
+  // Delegamos la elección de versión al mismo helper que usa pintarSoloQR
+  // (evita drift entre el centrado y el QR realmente pintado).
+  const int version = longitudUrlAVersion(url.size());
+  const int tamModulos = 17 + version * 4;  // regla del QR (4V + 17)
+  // Escala adaptativa: 6 px/módulo cabe para v2/v3 (150/174 px); v4 exige 5 y v5
+  // exige 4 para no clippear el QR ni la URL bajo el mismo (layout 320×240 con
+  // qrY=26 + URL font 1 debajo). Bajar la escala mantiene la legibilidad porque
+  // los módulos son cuadrados perfectos sin antialiasing.
+  const int escala = (version <= 3) ? 6 : (version == 4) ? 5 : 4;
+  const int lado = tamModulos * escala;
   const int qrX = (LADO_IZQ - lado) / 2;
   const int qrY = 26;
 
-  pintarSoloQR(tft, qrX, qrY, ESCALA, url, /*margen=*/6);
+  pintarSoloQR(tft, qrX, qrY, escala, url, /*margen=*/6);
 
   tft.setTextColor(COL_URL, COL_FONDO);
   tft.setTextFont(1);
   tft.setCursor(6, qrY + lado + 12);
   tft.print(url.c_str());
 
-  // Panel derecho: cada línea 18 px de alto en font 2.
+  // Panel derecho: cada línea con interlineado de 20 px en font 2.
   int py = 32;
   tft.setTextColor(COL_PANEL, COL_FONDO);
   tft.setTextFont(2);

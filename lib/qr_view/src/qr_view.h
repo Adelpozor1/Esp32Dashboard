@@ -15,10 +15,16 @@ int pintarSoloQR(TFT_eSPI& tft, int x, int y, int escala,
 
 // Pinta la vista completa "portal": título arriba-izq, QR grande a la izquierda
 // (240×240), panel derecho con `lineas` (una entrada por línea) y `url` debajo del QR.
-// Reutiliza pintarSoloQR internamente.
+// Reutiliza pintarSoloQR internamente. La `url` no debe exceder URL_MAX_CHARS;
+// URLs más largas se sustituyen por un mensaje de error en pantalla.
 void pintarPortalConQR(TFT_eSPI& tft,
                        const std::string& titulo,
                        const std::string& url,
                        const std::vector<std::string>& lineasPanel);
+
+// Máxima longitud de URL soportada por pintarPortalConQR sin degradar (queda
+// dentro del layout 320×240 landscape con márgenes cómodos). URLs por encima de
+// este límite se sustituyen por un mensaje de error en pantalla.
+constexpr size_t URL_MAX_CHARS = 100;
 
 }  // namespace qr_view
