@@ -3,39 +3,54 @@
 #include <vector>
 #include <cstdint>
 
+enum class ModoVista : uint8_t { FIJO = 0, CARRUSEL = 1 };
+
 struct Config {
+  // v1 (persistido desde el inicio del proyecto):
   std::string ssid;
   std::string password;
   std::string direccion;
   double lat = 0.0;
   double lon = 0.0;
   int    radio_km = 25;
+
+  // v2:
+  ModoVista modo = ModoVista::CARRUSEL;
+  uint16_t  intervalo_carrusel_s = 10;
+  uint8_t   vista_fija = 0;
+  std::vector<uint8_t> vistas_orden = {0, 1, 2, 3, 4, 5};
+
+  int16_t touch_min_x = 0;
+  int16_t touch_max_x = 0;
+  int16_t touch_min_y = 0;
+  int16_t touch_max_y = 0;
+  bool    touch_calibrado = false;
 };
 
 // Persistencia en NVS mediante Preferences. La serialización a bytes se expone
 // como funciones estáticas para poder testearla en native (sin depender de NVS).
 //
-// Formato binario (little-endian):
+// Layout binario (little-endian):
 //   [0..1]   magic 0xC0DE
-//   [2]      versión (1)
-//   [3..10]  lat (double, 8 bytes)
-//   [11..18] lon (double, 8 bytes)
-//   [19..20] radio_km (uint16)
-//   [21..22] len_ssid (uint16) | ssid bytes
-//   [..]     len_pass (uint16) | pass bytes
-//   [..]     len_dir  (uint16) | dir bytes
+//   [2]      version (1 o 2)
+//   Después, los campos v1 tal como estaban:
+//     lat (double), lon (double), radio_km (u16),
+//     ssid (u16 len + bytes), password (u16 len + bytes), direccion (u16 len + bytes)
+//   Si version == 2, a continuación:
+//     modo (u8), intervalo (u16), vista_fija (u8),
+//     n_vistas (u8), vistas_orden[n_vistas] (u8 c/u),
+//     touch_min_x (i16), touch_max_x (i16), touch_min_y (i16), touch_max_y (i16),
+//     touch_calibrado (u8)
 class ConfigStore {
  public:
   static constexpr uint16_t MAGIC = 0xC0DE;
-  static constexpr uint8_t  VERSION = 1;
+  static constexpr uint8_t  VERSION = 2;
   static constexpr size_t   MAX_STR = 128;
 
-  // Serialización pura (testeable en native).
   static void serializar(const Config& in, std::vector<uint8_t>& out);
   static bool deserializar(const uint8_t* data, size_t size, Config& out);
 
 #ifndef UNIT_TEST
-  // API con NVS (solo compila en la placa).
   static bool cargar(Config& out);
   static bool guardar(const Config& cfg);
   static void borrar();
