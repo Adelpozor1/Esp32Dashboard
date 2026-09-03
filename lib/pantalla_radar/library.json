@@ -1,0 +1,8 @@
+{
+  "name": "pantalla_radar",
+  "version": "0.1.0",
+  "description": "Vista Radar (sonar) para el carrusel",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43"
+  }
+}
