@@ -13,7 +13,7 @@ constexpr int Y_FECHA       = OFFSET_Y + 160;
 constexpr int Y_SYNC        = OFFSET_Y + 80;
 
 const char* diasSemana[7] = {
-  "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+  "domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado",
 };
 const char* meses[12] = {
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -78,6 +78,7 @@ void PantallaReloj::alEntrar() {
   ultSeg_ = -1;
   ultMin_ = -1;
   ultDia_ = -1;
+  ultSinc_ = false;
 }
 
 void PantallaReloj::dibujar(uint32_t) {
@@ -87,6 +88,8 @@ void PantallaReloj::dibujar(uint32_t) {
   struct tm tm;
   localtime_r(&now, &tm);
   const bool sincronizado = (tm.tm_year + 1900) >= 2000;
+  if (sincronizado && !ultSinc_) dirty_ = true;   // transición sync -> full repaint limpia restos
+  ultSinc_ = sincronizado;
 
   if (!sincronizado) {
     if (dirty_) {

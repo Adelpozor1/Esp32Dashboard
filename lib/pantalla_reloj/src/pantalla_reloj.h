@@ -17,4 +17,5 @@ class PantallaReloj : public pantallas::Pantalla {
   int  ultMin_ = -1;
   int  ultDia_ = -1;
   bool dirty_  = true;   // fuerza repintado completo (fondo + todo)
+  bool ultSinc_ = false;
 };
