@@ -88,7 +88,7 @@ void ConfigStore::serializar(const Config& in, std::vector<uint8_t>& out) {
   escribirU8 (out, static_cast<uint8_t>(in.modo));
   escribirU16(out, in.intervalo_carrusel_s);
   escribirU8 (out, in.vista_fija);
-  uint8_t n = static_cast<uint8_t>(std::min<size_t>(in.vistas_orden.size(), 32));
+  uint8_t n = static_cast<uint8_t>(std::min<size_t>(in.vistas_orden.size(), ConfigStore::MAX_VISTAS));
   escribirU8(out, n);
   for (uint8_t i = 0; i < n; ++i) escribirU8(out, in.vistas_orden[i]);
   escribirI16(out, in.touch_min_x);
@@ -128,17 +128,21 @@ bool ConfigStore::deserializar(const uint8_t* data, size_t size, Config& out) {
   if (version == 2) {
     uint8_t modoU8;
     if (!leerU8(data, size, pos, modoU8)) return false;
-    tmp.modo = (modoU8 == 0) ? ModoVista::FIJO : ModoVista::CARRUSEL;
+    if (modoU8 > 1) return false;   // valores futuros no reconocidos → rechazo estricto
+    tmp.modo = static_cast<ModoVista>(modoU8);
     if (!leerU16(data, size, pos, tmp.intervalo_carrusel_s)) return false;
     if (!leerU8 (data, size, pos, tmp.vista_fija))          return false;
     uint8_t n;
     if (!leerU8(data, size, pos, n)) return false;
-    if (n > 32) return false;
+    if (n > ConfigStore::MAX_VISTAS) return false;
     tmp.vistas_orden.clear();
     tmp.vistas_orden.reserve(n);
     for (uint8_t i = 0; i < n; ++i) {
       uint8_t vid;
       if (!leerU8(data, size, pos, vid)) return false;
+      // Ids válidos hoy: 0..5 (IdVista). Un id fuera de rango en NVS es corrupción o
+      // downgrade de firmware; rechazamos para no dereferenciar basura en el dispatcher.
+      if (vid > 5) return false;
       tmp.vistas_orden.push_back(vid);
     }
     if (!leerI16(data, size, pos, tmp.touch_min_x)) return false;

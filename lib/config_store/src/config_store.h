@@ -38,7 +38,7 @@ struct Config {
 //     ssid (u16 len + bytes), password (u16 len + bytes), direccion (u16 len + bytes)
 //   Si version == 2, a continuación:
 //     modo (u8), intervalo (u16), vista_fija (u8),
-//     n_vistas (u8), vistas_orden[n_vistas] (u8 c/u),
+//     n_vistas (u8), vistas_orden[n_vistas] (u8 c/u — cada vid en 0..MAX_ID_VISTA),
 //     touch_min_x (i16), touch_max_x (i16), touch_min_y (i16), touch_max_y (i16),
 //     touch_calibrado (u8)
 class ConfigStore {
@@ -46,6 +46,9 @@ class ConfigStore {
   static constexpr uint16_t MAGIC = 0xC0DE;
   static constexpr uint8_t  VERSION = 2;
   static constexpr size_t   MAX_STR = 128;
+  // Cap defensivo del vector `vistas_orden` en NVS. Hoy sobra (sólo hay 6 vistas),
+  // pero dejamos margen si se añaden pantallas nuevas o para tolerar upgrades.
+  static constexpr uint8_t  MAX_VISTAS = 32;
 
   static void serializar(const Config& in, std::vector<uint8_t>& out);
   static bool deserializar(const uint8_t* data, size_t size, Config& out);
