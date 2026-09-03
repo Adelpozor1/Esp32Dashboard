@@ -81,6 +81,9 @@ void GestorPantallas::tick(uint32_t msAhora) {
           // Volver al home vaciando la pila.
           pilaUi_.clear();
           aplicarPantalla(home_, msAhora);
+        } else if (ev.y < ZONA_MENU_Y_MAX) {
+          // TAP en la barra superior pero fuera del botón menú: se ignora
+          // (esa banda está reservada al chrome, no al contenido).
         } else if (actual_) {
           // Coordenadas relativas al área de contenido (restar barra).
           actual_->alTocar(ev.x, ev.y - 20);
@@ -106,8 +109,16 @@ void GestorPantallas::tick(uint32_t msAhora) {
       && !orden_.empty() && intervaloS_ > 0) {
     const uint32_t delta = msAhora - ultimoCambioMs_;
     if (delta >= static_cast<uint32_t>(intervaloS_) * 1000u) {
-      indiceCarrusel_ = (indiceCarrusel_ + 1) % orden_.size();
-      aplicarPantalla(pantallaPorId(orden_[indiceCarrusel_]), msAhora);
+      // Avanza saltando el home si por error se ha registrado en orden_
+      // (evita que el carrusel se quede congelado al aterrizar en home).
+      for (size_t intentos = 0; intentos < orden_.size(); ++intentos) {
+        indiceCarrusel_ = (indiceCarrusel_ + 1) % orden_.size();
+        Pantalla* siguiente = pantallaPorId(orden_[indiceCarrusel_]);
+        if (siguiente != home_) {
+          aplicarPantalla(siguiente, msAhora);
+          break;
+        }
+      }
     }
   }
 

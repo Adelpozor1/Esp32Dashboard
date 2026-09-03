@@ -68,7 +68,7 @@ void test_swipe_manual_adelanta_y_resetea_timer(void) {
 
   // Timer reseteado: 3 s más NO debería rotar (necesitamos otros 5).
   g.tick(5000);
-  TEST_ASSERT_EQUAL(0, a.nEntradas - 1);  // a.nEntradas sigue en 1
+  TEST_ASSERT_EQUAL(1, a.nEntradas);  // a sigue con 1 entrada; el timer se ha reseteado
   g.tick(7500);  // 5.5 s desde el swipe -> rota
   TEST_ASSERT_EQUAL(2, a.nEntradas);
 }
@@ -134,6 +134,40 @@ void test_pila_ui_pausa_el_carrusel(void) {
   TEST_ASSERT_EQUAL(1, b.nEntradas);
 }
 
+void test_tap_fuera_de_barra_menu_se_delega_con_offset_correcto(void) {
+  RendererFake r;
+  PantallaFake a("A", 0);
+  GestorPantallas g(r);
+  g.registrar(&a);
+  g.configurarModo(ModoGestor::CARRUSEL, /*intervaloS=*/60, {0}, 0);
+  g.iniciar(0);
+
+  // TAP a (160, 60) — dentro del área de contenido, fuera del botón menú.
+  g.encolarEvento({TipoEventoUi::TAP, 160, 60});
+  g.tick(1000);
+  TEST_ASSERT_EQUAL(160, a.ultTapX);
+  TEST_ASSERT_EQUAL(40, a.ultTapY);   // 60 - 20 barra = 40
+}
+
+void test_tap_en_barra_fuera_del_boton_menu_se_ignora(void) {
+  RendererFake r;
+  PantallaFake home("Home", 10);
+  PantallaFake a("A", 0);
+  GestorPantallas g(r);
+  g.setHome(&home);
+  g.registrar(&home); g.registrar(&a);
+  g.configurarModo(ModoGestor::CARRUSEL, 60, {0}, 0);
+  g.iniciar(0);
+
+  // TAP en (200, 10): dentro de la barra (y<20) pero fuera del botón menú (x>=40).
+  g.encolarEvento({TipoEventoUi::TAP, 200, 10});
+  g.tick(1000);
+  // Ni a ni home reciben tap: la banda superior fuera del botón está reservada.
+  TEST_ASSERT_EQUAL(-1, a.ultTapX);
+  TEST_ASSERT_EQUAL(-1, a.ultTapY);
+  TEST_ASSERT_EQUAL(0, home.nEntradas);  // el TAP no navega a home
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_modo_carrusel_rota_al_pasar_el_intervalo);
@@ -141,5 +175,7 @@ int main(int, char**) {
   RUN_TEST(test_modo_fijo_ignora_timer_y_swipe);
   RUN_TEST(test_tap_en_zona_menu_vuelve_a_home_y_vacia_pila);
   RUN_TEST(test_pila_ui_pausa_el_carrusel);
+  RUN_TEST(test_tap_fuera_de_barra_menu_se_delega_con_offset_correcto);
+  RUN_TEST(test_tap_en_barra_fuera_del_boton_menu_se_ignora);
   return UNITY_END();
 }
