@@ -1066,7 +1066,7 @@ struct CalibracionTouch {
 void iniciar(const CalibracionTouch& cal);
 
 // Actualiza la calibración usada por la task (sin necesidad de reiniciar).
-void setCalibracion(const CalibracionTouch& cal);
+void actualizarCalibracion(const CalibracionTouch& cal);
 
 // Espera hasta `timeoutMs` un evento gesto. Devuelve true si sacó uno; false por timeout.
 bool esperarEvento(EventoTactil& out, uint32_t timeoutMs);
@@ -1156,7 +1156,7 @@ void iniciar(const CalibracionTouch& cal) {
   Serial.println("[touch] task de poll arrancada");
 }
 
-void setCalibracion(const CalibracionTouch& cal) { s_cal = cal; }
+void actualizarCalibracion(const CalibracionTouch& cal) { s_cal = cal; }
 
 bool esperarEvento(EventoTactil& out, uint32_t timeoutMs) {
   if (!s_cola) return false;
@@ -2916,7 +2916,7 @@ void PantallaCalibrarTouch::dibujar(uint32_t) {
     cfg_.touch_calibrado = true;
     ConfigStore::guardar(cfg_);
     touch::CalibracionTouch nueva{minX, maxX, minY, maxY, true};
-    touch::setCalibracion(nueva);
+    touch::actualizarCalibracion(nueva);
     gestor_.volverAtras();
     dirty_ = false;
     return;
