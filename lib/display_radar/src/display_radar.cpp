@@ -1,5 +1,6 @@
 #include "display_radar.h"
 #include "qr_view.h"
+#include "tft_driver.h"
 #include <TFT_eSPI.h>
 #include <cmath>
 #include <cstdio>
@@ -8,8 +9,7 @@
 
 namespace {
 
-TFT_eSPI       s_tft;
-TFT_eSprite    s_sprite(&s_tft);  // buffer offscreen 240x240 para el área del radar
+TFT_eSprite    s_sprite(&tft_driver::getTft());  // buffer offscreen 240x240 para el área del radar
 bool           s_iniciado = false;
 
 // Layout landscape (rotation 1) → 320x240
@@ -158,19 +158,19 @@ void dibujarAvionSonar(TFT_eSprite& s, const Aeronave& a, int radioKm, int angBa
 // Panel derecho: nº aviones + destacado del más cercano (callsign, distancia,
 // altitud). Si dist<3km, alerta en rojo "!ENCIMA!".
 void pintarPanelSonar(const Snapshot& snap) {
-  s_tft.fillRect(PANEL_X, 0, PANEL_ANCHO, PANTALLA_ALTO, COL_FONDO);
+  tft_driver::getTft().fillRect(PANEL_X, 0, PANEL_ANCHO, PANTALLA_ALTO, COL_FONDO);
   char buf[24];
 
-  s_tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
-  s_tft.setTextFont(1);
-  s_tft.setCursor(PANEL_X + 4, 4);
+  tft_driver::getTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
+  tft_driver::getTft().setTextFont(1);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 4);
   std::snprintf(buf, sizeof(buf), "%d aviones", (int)snap.aeronaves.size());
-  s_tft.print(buf);
+  tft_driver::getTft().print(buf);
 
   if (snap.stale) {
-    s_tft.setTextColor(COL_STALE, COL_FONDO);
-    s_tft.setCursor(PANEL_X + 4, 16);
-    s_tft.print("stale");
+    tft_driver::getTft().setTextColor(COL_STALE, COL_FONDO);
+    tft_driver::getTft().setCursor(PANEL_X + 4, 16);
+    tft_driver::getTft().print("stale");
   }
 
   // Encontrar el avión más cercano
@@ -179,12 +179,12 @@ void pintarPanelSonar(const Snapshot& snap) {
     if (!mc || a.dist_km < mc->dist_km) mc = &a;
   }
   if (!mc) {
-    s_tft.setTextColor(COL_GRID_TXT, COL_FONDO);
-    s_tft.setTextFont(2);
-    s_tft.setCursor(PANEL_X + 4, 40);
-    s_tft.print("sin");
-    s_tft.setCursor(PANEL_X + 4, 58);
-    s_tft.print("aviones");
+    tft_driver::getTft().setTextColor(COL_GRID_TXT, COL_FONDO);
+    tft_driver::getTft().setTextFont(2);
+    tft_driver::getTft().setCursor(PANEL_X + 4, 40);
+    tft_driver::getTft().print("sin");
+    tft_driver::getTft().setCursor(PANEL_X + 4, 58);
+    tft_driver::getTft().print("aviones");
     return;
   }
 
@@ -192,39 +192,39 @@ void pintarPanelSonar(const Snapshot& snap) {
   const uint16_t col = encima ? COL_ENCIMA : COL_PANEL_TXT;
 
   // Callsign en font 2
-  s_tft.setTextColor(col, COL_FONDO);
-  s_tft.setTextFont(2);
-  s_tft.setCursor(PANEL_X + 4, 38);
-  s_tft.print((mc->callsign.empty() ? mc->hex : mc->callsign).c_str());
+  tft_driver::getTft().setTextColor(col, COL_FONDO);
+  tft_driver::getTft().setTextFont(2);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 38);
+  tft_driver::getTft().print((mc->callsign.empty() ? mc->hex : mc->callsign).c_str());
 
   // Distancia en font 4 (grande)
-  s_tft.setTextFont(4);
-  s_tft.setCursor(PANEL_X + 4, 62);
+  tft_driver::getTft().setTextFont(4);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 62);
   if (mc->dist_km < 10.0) std::snprintf(buf, sizeof(buf), "%.1f", mc->dist_km);
   else                    std::snprintf(buf, sizeof(buf), "%d", (int)mc->dist_km);
-  s_tft.print(buf);
-  s_tft.setTextFont(2);
-  s_tft.setCursor(PANEL_X + 4, 96);
-  s_tft.print("km");
+  tft_driver::getTft().print(buf);
+  tft_driver::getTft().setTextFont(2);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 96);
+  tft_driver::getTft().print("km");
 
   // Altitud
-  s_tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
-  s_tft.setTextFont(2);
-  s_tft.setCursor(PANEL_X + 4, 122);
+  tft_driver::getTft().setTextColor(COL_PANEL_TXT, COL_FONDO);
+  tft_driver::getTft().setTextFont(2);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 122);
   std::snprintf(buf, sizeof(buf), "%dft", mc->alt_ft);
-  s_tft.print(buf);
+  tft_driver::getTft().print(buf);
 
   // Rumbo
-  s_tft.setCursor(PANEL_X + 4, 144);
+  tft_driver::getTft().setCursor(PANEL_X + 4, 144);
   std::snprintf(buf, sizeof(buf), "%d\xB0", mc->bearing);
-  s_tft.print(buf);
+  tft_driver::getTft().print(buf);
 
   // Alerta
   if (encima) {
-    s_tft.setTextColor(COL_ENCIMA, COL_FONDO);
-    s_tft.setTextFont(2);
-    s_tft.setCursor(PANEL_X + 4, 200);
-    s_tft.print("ENCIMA");
+    tft_driver::getTft().setTextColor(COL_ENCIMA, COL_FONDO);
+    tft_driver::getTft().setTextFont(2);
+    tft_driver::getTft().setCursor(PANEL_X + 4, 200);
+    tft_driver::getTft().print("ENCIMA");
   }
 }
 
@@ -232,12 +232,7 @@ void pintarPanelSonar(const Snapshot& snap) {
 
 void DisplayRadar::iniciar() {
   if (s_iniciado) return;
-  s_tft.init();
-  s_tft.setRotation(1);   // landscape 320x240
-  s_tft.fillScreen(COL_FONDO);
-  // Backlight: en la CYD el BL va en GPIO 21, active-high
-  pinMode(21, OUTPUT);
-  digitalWrite(21, HIGH);
+  tft_driver::iniciar();
   // Sprite offscreen para el área del radar en 8bpp (240x240 = 57 KB).
   // 16bpp = 115 KB no cabe en el heap con WiFi+AsyncWebServer levantados.
   s_sprite.setColorDepth(8);
@@ -251,15 +246,7 @@ void DisplayRadar::iniciar() {
 }
 
 void DisplayRadar::pintarMensaje(const std::string& titulo, const std::string& detalle) {
-  if (!s_iniciado) return;
-  s_tft.fillScreen(COL_FONDO);
-  s_tft.setTextColor(COL_PANEL_TXT, COL_FONDO);
-  s_tft.setTextFont(4);
-  s_tft.setCursor(10, 60);
-  s_tft.print(titulo.c_str());
-  s_tft.setTextFont(2);
-  s_tft.setCursor(10, 110);
-  s_tft.print(detalle.c_str());
+  tft_driver::pintarSplash(titulo, detalle);
 }
 
 void DisplayRadar::pintarPortalQR(const std::string& ssidAp, const std::string& url) {
@@ -274,7 +261,7 @@ void DisplayRadar::pintarPortalQR(const std::string& ssidAp, const std::string& 
     "o abre la",
     "URL a mano",
   };
-  qr_view::pintarPortalConQR(s_tft, "Modo Portal", url, lineas);
+  qr_view::pintarPortalConQR(tft_driver::getTft(), "Modo Portal", url, lineas);
 }
 
 void DisplayRadar::pintarRadar(const Snapshot& snap, int anguloBarridoDeg) {

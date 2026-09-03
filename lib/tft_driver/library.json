@@ -1,0 +1,8 @@
+{
+  "name": "tft_driver",
+  "version": "0.1.0",
+  "description": "Inicialización compartida del TFT y helpers básicos",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43"
+  }
+}
