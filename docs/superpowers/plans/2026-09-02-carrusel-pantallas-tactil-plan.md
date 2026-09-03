@@ -23,7 +23,7 @@
 | `lib/qr_view/src/qr_view.h` | API `pintarQR(titulo, url, subtexto)` | crear |
 | `lib/qr_view/src/qr_view.cpp` | Implementación con TFT_eSPI + ricmoo/QRCode | crear |
 | `lib/qr_view/library.json` | Manifest de la lib | crear |
-| `lib/tft_driver/src/tft_driver.h` | Init TFT + backlight, singleton `getTft()` | crear |
+| `lib/tft_driver/src/tft_driver.h` | Init TFT + backlight, singleton `obtenerTft()` | crear |
 | `lib/tft_driver/src/tft_driver.cpp` | Implementación | crear |
 | `lib/tft_driver/library.json` | Manifest de la lib | crear |
 | `lib/touch/src/gesture_detector.h` | Detector de gestos puro (testeable en native) | crear |
@@ -707,7 +707,7 @@ git commit -m "refactor(qr): extraer QR portal a lib qr_view; display_radar dele
 - Create: `lib/tft_driver/library.json`
 - Create: `lib/tft_driver/src/tft_driver.h`
 - Create: `lib/tft_driver/src/tft_driver.cpp`
-- Modify: `lib/display_radar/src/display_radar.cpp` (usar `tft_driver::getTft()`)
+- Modify: `lib/display_radar/src/display_radar.cpp` (usar `tft_driver::obtenerTft()`)
 
 - [ ] **Step 1: Crear `lib/tft_driver/library.json`**
 
@@ -738,7 +738,7 @@ void iniciar();
 
 // Devuelve la instancia global de TFT_eSPI. Necesario porque TFT_eSPI ocupa
 // bastante RAM y no queremos duplicarla por pantalla.
-TFT_eSPI& getTft();
+TFT_eSPI& obtenerTft();
 
 // Pinta un splash centrado de dos líneas (título grande + detalle). Usado
 // antes de que exista GestorPantallas (splash de arranque, "conectando WiFi").
@@ -774,7 +774,7 @@ void iniciar() {
   s_iniciado = true;
 }
 
-TFT_eSPI& getTft() { return s_tft; }
+TFT_eSPI& obtenerTft() { return s_tft; }
 
 void pintarSplash(const std::string& titulo, const std::string& detalle) {
   if (!s_iniciado) return;
@@ -799,7 +799,7 @@ En `lib/display_radar/src/display_radar.cpp`, sustituir el bloque `namespace { T
 #include "tft_driver.h"
 // ...
 namespace {
-TFT_eSprite    s_sprite(&tft_driver::getTft());
+TFT_eSprite    s_sprite(&tft_driver::obtenerTft());
 bool           s_iniciado = false;
 // ... (constantes de colores igual)
 }
@@ -817,7 +817,7 @@ void DisplayRadar::iniciar() {
 }
 ```
 
-Reemplazar todas las referencias a `s_tft` en el resto del fichero por `tft_driver::getTft()`.
+Reemplazar todas las referencias a `s_tft` en el resto del fichero por `tft_driver::obtenerTft()`.
 
 Y en `DisplayRadar::pintarMensaje`, redirigir a `tft_driver::pintarSplash`:
 
@@ -1887,7 +1887,7 @@ PantallaRadar::~PantallaRadar() { alSalir(); }
 
 void PantallaRadar::alEntrar() {
   if (sprite_) return;
-  sprite_ = new TFT_eSprite(&tft_driver::getTft());
+  sprite_ = new TFT_eSprite(&tft_driver::obtenerTft());
   sprite_->setColorDepth(8);
   void* p = sprite_->createSprite(LADO_RADAR, LADO_RADAR);
   Serial.printf("[radar] sprite %dx%d -> %s (heap %u)\n",
@@ -1912,7 +1912,7 @@ void PantallaRadar::dibujar(uint32_t) {
     dibujarAvionSonar(*sprite_, a, snap.radio_km, angBarrido_);
   }
   sprite_->pushSprite(0, OFFSET_Y);
-  pintarPanelSonar(tft_driver::getTft(), snap);
+  pintarPanelSonar(tft_driver::obtenerTft(), snap);
   angBarrido_ = (angBarrido_ + 10) % 360;
 }
 ```
@@ -2015,7 +2015,7 @@ void PantallaMenu::alTocar(int x, int y) {
 
 void PantallaMenu::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, OFFSET_Y, 320, 220, COL_FONDO);
   tft.setTextFont(2);
   tft.setTextColor(COL_TXT, COL_FONDO);
@@ -2094,7 +2094,7 @@ class PantallaProximamente : public pantallas::Pantalla {
 
 void PantallaProximamente::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, 20, 320, 220, 0x0000);
   tft.setTextColor(0x07E0, 0x0000);
   tft.setTextFont(4);
@@ -2247,7 +2247,7 @@ void PantallaAjustes::alTocar(int x, int y) {
 
 void PantallaAjustes::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, OFFSET_Y, 320, 220, COL_FONDO);
   tft.setTextFont(2);
   tft.setTextColor(COL_TXT, COL_FONDO);
@@ -2352,7 +2352,7 @@ void PantallaIntervalo::alTocar(int x, int y) {
 
 void PantallaIntervalo::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, 20, 320, 220, 0x0000);
   tft.setTextColor(0x07E0, 0x0000);
   tft.setTextFont(2);
@@ -2518,7 +2518,7 @@ void PantallaSeleccionVistas::alTocar(int x, int y) {
 
 void PantallaSeleccionVistas::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, OFFSET_Y, 320, 220, 0x0000);
   tft.setTextFont(2);
   tft.setTextColor(0x07E0, 0x0000);
@@ -2623,7 +2623,7 @@ void PantallaSeleccionVistaFija::alTocar(int x, int y) {
 
 void PantallaSeleccionVistaFija::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, OFFSET_Y, 320, 220, 0x0000);
   tft.setTextFont(2);
   tft.setTextColor(0x07E0, 0x0000);
@@ -2709,7 +2709,7 @@ void PantallaConfirmarReset::alTocar(int x, int y) {
 
 void PantallaConfirmarReset::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, 20, 320, 220, 0x0000);
   tft.setTextFont(2);
   tft.setTextColor(0xF800, 0x0000);
@@ -2797,7 +2797,7 @@ void PantallaConfigLocalizacion::alTocar(int x, int y) {
 
 void PantallaConfigLocalizacion::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   tft.fillRect(0, 20, 320, 220, 0x0000);
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -2904,7 +2904,7 @@ void PantallaCalibrarTouch::alEntrar() {
 
 void PantallaCalibrarTouch::dibujar(uint32_t) {
   if (!dirty_) return;
-  auto& tft = tft_driver::getTft();
+  auto& tft = tft_driver::obtenerTft();
   if (paso_ >= 4) {
     // Guardar y salir.
     int16_t minX = std::min({rawX_[0], rawX_[1], rawX_[2], rawX_[3]});
@@ -3012,7 +3012,7 @@ uint32_t        g_ultimoIntentoWifiMs = 0;
 class RenderizadorUiReal : public pantallas::IRenderizadorUi {
  public:
   void pintarBarraSuperior(const char* titulo, uint8_t dotAct, uint8_t nDots) override {
-    auto& tft = tft_driver::getTft();
+    auto& tft = tft_driver::obtenerTft();
     tft.fillRect(0, 0, 320, 20, 0x0000);
     // Botón menú
     tft.setTextColor(0x07E0, 0x0000);
@@ -3033,7 +3033,7 @@ class RenderizadorUiReal : public pantallas::IRenderizadorUi {
     }
   }
   void limpiarAreaContenido() override {
-    tft_driver::getTft().fillRect(0, 20, 320, 220, 0x0000);
+    tft_driver::obtenerTft().fillRect(0, 20, 320, 220, 0x0000);
   }
 };
 
@@ -3253,7 +3253,7 @@ En `lib/wifi_portal/src/wifi_portal.cpp`, dentro de `WifiPortal::ejecutar`, tras
     "o abre la",
     "URL a mano",
   };
-  qr_view::pintarPortalConQR(tft_driver::getTft(), "Modo Portal",
+  qr_view::pintarPortalConQR(tft_driver::obtenerTft(), "Modo Portal",
                              "http://192.168.4.1/", lineas);
 }
 ```
