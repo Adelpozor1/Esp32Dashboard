@@ -1,6 +1,8 @@
 #include "wifi_portal.h"
 #include "geocoder.h"
 #include "status_led.h"
+#include "qr_view.h"
+#include "tft_driver.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
@@ -8,6 +10,7 @@
 #include <ArduinoJson.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <vector>
 
 namespace {
 
@@ -195,6 +198,23 @@ void WifiPortal::ejecutar(IHttpClient& http) {
 
   server.begin();
   Serial.println("[portal] esperando configuración...");
+
+  // Pintar QR del AP en pantalla (antes vivía en DisplayRadar::pintarPortalQR).
+  {
+    std::vector<std::string> lineas = {
+      "1. WiFi:",
+      ssidAp.c_str(),
+      "",
+      "2. Escanea",
+      "   el QR",
+      "",
+      "o abre la",
+      "URL a mano",
+    };
+    qr_view::pintarPortalConQR(tft_driver::obtenerTft(), "Modo Portal",
+                               "http://192.168.4.1/", lineas);
+  }
+
   for (;;) {
     delay(1000);
   }
