@@ -1,0 +1,5 @@
+{
+  "name": "touch",
+  "version": "0.1.0",
+  "description": "Panel táctil XPT2046 + detector de gestos + cola de eventos"
+}
