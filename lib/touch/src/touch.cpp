@@ -17,11 +17,14 @@ namespace touch {
 
 namespace {
 
-SPIClass* s_spi = nullptr;
-XPT2046_Touchscreen* s_ts = nullptr;
+SPIClass s_spi(HSPI);
+XPT2046_Touchscreen s_ts(XPT_CS, XPT_IRQ);
+bool s_hwIniciado = false;
 CalibracionTouch s_cal;
 GestureDetector s_det;
 QueueHandle_t s_cola = nullptr;
+TaskHandle_t s_tarea = nullptr;
+volatile bool s_pausarPoll = false;
 
 int16_t mapearX(int16_t xRaw) {
   if (!s_cal.valida || s_cal.max_x <= s_cal.min_x) return 0;
@@ -40,19 +43,32 @@ void tareaTouch(void*) {
   bool estabaTocado = false;
   int16_t xr = 0, yr = 0;
   for (;;) {
-    bool tocado = s_ts->touched();
+    if (s_pausarPoll) {
+      vTaskDelay(pdMS_TO_TICKS(20));
+      continue;
+    }
+    bool tocado = s_ts.touched();
     if (tocado) {
-      TS_Point p = s_ts->getPoint();
+      TS_Point p = s_ts.getPoint();
       xr = p.x; yr = p.y;
       if (!estabaTocado) {
-        s_det.onPress(mapearX(xr), mapearY(yr), millis());
+        // Sin calibración válida no producimos gestos: mapear a coords sin sentido
+        // (0,0) caería en la zona del botón "menú" del gestor y atraparía al usuario.
+        // La pantalla de calibración usa leerCrudoBloqueante, no la cola.
+        if (s_cal.valida) {
+          s_det.onPress(mapearX(xr), mapearY(yr), millis());
+        }
         estabaTocado = true;
       }
     } else if (estabaTocado) {
-      auto ev = s_det.onRelease(mapearX(xr), mapearY(yr), millis());
-      if (ev.has_value() && s_cola != nullptr) {
-        EventoTactil e = ev.value();
-        xQueueSend(s_cola, &e, 0);
+      if (s_cal.valida) {
+        auto ev = s_det.onRelease(mapearX(xr), mapearY(yr), millis());
+        if (ev.has_value() && s_cola != nullptr) {
+          EventoTactil e = ev.value();
+          if (xQueueSend(s_cola, &e, 0) != pdTRUE) {
+            Serial.println("[touch] cola llena, gesto descartado");
+          }
+        }
       }
       estabaTocado = false;
     }
@@ -64,23 +80,24 @@ void tareaTouch(void*) {
 
 void iniciar(const CalibracionTouch& cal) {
   s_cal = cal;
-  if (s_spi == nullptr) {
-    s_spi = new SPIClass(HSPI);
-    s_spi->begin(XPT_CLK, XPT_MISO, XPT_MOSI, XPT_CS);
-  }
-  if (s_ts == nullptr) {
-    s_ts = new XPT2046_Touchscreen(XPT_CS, XPT_IRQ);
-    s_ts->begin(*s_spi);
-    s_ts->setRotation(1);
+  if (!s_hwIniciado) {
+    s_spi.begin(XPT_CLK, XPT_MISO, XPT_MOSI, XPT_CS);
+    s_ts.begin(s_spi);
+    s_ts.setRotation(1);
+    s_hwIniciado = true;
   }
   if (s_cola == nullptr) {
     s_cola = xQueueCreate(16, sizeof(EventoTactil));
   }
-  xTaskCreatePinnedToCore(tareaTouch, "touch", 4096, nullptr, 1, nullptr, 0);
-  Serial.println("[touch] task de poll arrancada");
+  if (s_tarea == nullptr) {
+    xTaskCreatePinnedToCore(tareaTouch, "touch", 4096, nullptr, 1, &s_tarea, 0);
+    Serial.println("[touch] task de poll arrancada");
+  } else {
+    Serial.println("[touch] task ya arrancada, iniciar() reasigna calibracion");
+  }
 }
 
-void setCalibracion(const CalibracionTouch& cal) { s_cal = cal; }
+void actualizarCalibracion(const CalibracionTouch& cal) { s_cal = cal; }
 
 bool esperarEvento(EventoTactil& out, uint32_t timeoutMs) {
   if (!s_cola) return false;
@@ -88,27 +105,39 @@ bool esperarEvento(EventoTactil& out, uint32_t timeoutMs) {
 }
 
 bool leerCrudoBloqueante(int16_t& xRawOut, int16_t& yRawOut, uint32_t timeoutMs) {
+  s_pausarPoll = true;
+  // Dar tiempo a que la task de poll vea el flag y ceda el bus.
+  vTaskDelay(pdMS_TO_TICKS(60));
+  bool ok = false;
   const uint32_t inicio = millis();
   // Espera press
-  while (!s_ts->touched()) {
-    if (millis() - inicio > timeoutMs) return false;
+  while (!s_ts.touched()) {
+    if (millis() - inicio > timeoutMs) goto salir;
     vTaskDelay(pdMS_TO_TICKS(20));
   }
-  // Promedia 8 muestras mientras está tocando
-  int32_t sx = 0, sy = 0;
-  int n = 0;
-  while (s_ts->touched() && n < 8) {
-    TS_Point p = s_ts->getPoint();
-    sx += p.x; sy += p.y;
-    ++n;
-    vTaskDelay(pdMS_TO_TICKS(20));
+  {
+    int32_t sx = 0, sy = 0;
+    int n = 0;
+    while (s_ts.touched() && n < 8) {
+      TS_Point p = s_ts.getPoint();
+      sx += p.x; sy += p.y;
+      ++n;
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    if (n == 0) goto salir;
+    xRawOut = static_cast<int16_t>(sx / n);
+    yRawOut = static_cast<int16_t>(sy / n);
+    // Espera release (con timeout duro de 5 s para no colgarse ante fallo HW).
+    const uint32_t inicioRelease = millis();
+    while (s_ts.touched()) {
+      if (millis() - inicioRelease > 5000) goto salir;
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    ok = true;
   }
-  if (n == 0) return false;
-  xRawOut = static_cast<int16_t>(sx / n);
-  yRawOut = static_cast<int16_t>(sy / n);
-  // Espera release
-  while (s_ts->touched()) vTaskDelay(pdMS_TO_TICKS(20));
-  return true;
+salir:
+  s_pausarPoll = false;
+  return ok;
 }
 
 }  // namespace touch
