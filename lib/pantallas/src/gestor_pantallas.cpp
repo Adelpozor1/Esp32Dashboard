@@ -100,6 +100,14 @@ void GestorPantallas::tick(uint32_t msAhora) {
           indiceCarrusel_ = (indiceCarrusel_ + orden_.size() - 1) % orden_.size();
         aplicarPantalla(pantallaPorId(orden_[indiceCarrusel_]), msAhora);
         break;
+      case TipoEventoUi::SWIPE_ARRIBA:
+      case TipoEventoUi::SWIPE_ABAJO:
+        if (!pilaUi_.empty()) break;               // pila abierta: ignorar
+        if (actual_) {
+          actual_->alDeslizar(ev.tipo == TipoEventoUi::SWIPE_ARRIBA
+                              ? Direccion::ARRIBA : Direccion::ABAJO);
+        }
+        break;
     }
   }
   cola_.clear();

@@ -9,9 +9,11 @@ namespace pantallas {
 enum class ModoGestor : uint8_t { FIJO = 0, CARRUSEL = 1 };
 
 enum class TipoEventoUi : uint8_t {
-  TAP = 0,
+  TAP             = 0,
   SWIPE_IZQUIERDA = 1,
   SWIPE_DERECHA   = 2,
+  SWIPE_ARRIBA    = 3,
+  SWIPE_ABAJO     = 4,
 };
 
 struct EventoUi {

@@ -3,6 +3,13 @@
 
 namespace pantallas {
 
+enum class Direccion : uint8_t {
+  IZQUIERDA = 0,
+  DERECHA   = 1,
+  ARRIBA    = 2,
+  ABAJO     = 3,
+};
+
 class Pantalla {
  public:
   virtual ~Pantalla() = default;
@@ -21,8 +28,8 @@ class Pantalla {
   // Coordenadas relativas al área de contenido (0..319, 0..219). Origen arriba-izq.
   virtual void alTocar(int /*x*/, int /*y*/) {}
 
-  // direccion: -1 swipe a izquierda (siguiente), +1 swipe a derecha (anterior).
-  virtual void alDeslizar(int /*direccion*/) {}
+  // direccion: sentido del swipe interpretado por el gestor táctil.
+  virtual void alDeslizar(Direccion /*direccion*/) {}
 
   // msAhora: reloj monótono en ms. La pantalla decide si repinta o no.
   virtual void dibujar(uint32_t msAhora) = 0;

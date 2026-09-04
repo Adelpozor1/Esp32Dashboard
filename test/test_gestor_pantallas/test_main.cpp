@@ -15,14 +15,16 @@ class PantallaFake : public Pantalla {
   const char* nombreFake;
   uint8_t idFake;
   int nEntradas = 0, nSalidas = 0, nDibujos = 0;
-  int ultTapX = -1, ultTapY = -1, ultSwipe = 0;
+  int ultTapX = -1, ultTapY = -1;
+  int nSwipes = 0;
+  pantallas::Direccion ultDir = pantallas::Direccion::IZQUIERDA;
   PantallaFake(const char* n, uint8_t i) : nombreFake(n), idFake(i) {}
   const char* nombre() const override { return nombreFake; }
   uint8_t id() const override { return idFake; }
   void alEntrar() override { ++nEntradas; }
   void alSalir() override { ++nSalidas; }
   void alTocar(int x, int y) override { ultTapX = x; ultTapY = y; }
-  void alDeslizar(int d) override { ultSwipe = d; }
+  void alDeslizar(pantallas::Direccion d) override { ++nSwipes; ultDir = d; }
   void dibujar(uint32_t) override { ++nDibujos; }
 };
 
@@ -168,6 +170,45 @@ void test_tap_en_barra_fuera_del_boton_menu_se_ignora(void) {
   TEST_ASSERT_EQUAL(0, home.nEntradas);  // el TAP no navega a home
 }
 
+void test_swipe_vertical_se_delega_a_pantalla_actual(void) {
+  RendererFake r;
+  PantallaFake a("A", 0);
+  GestorPantallas g(r);
+  g.registrar(&a);
+  g.configurarModo(ModoGestor::CARRUSEL, /*intervaloS=*/60, {0}, 0);
+  g.iniciar(0);
+
+  g.encolarEvento({TipoEventoUi::SWIPE_ARRIBA, 100, 120});
+  g.tick(1000);
+  TEST_ASSERT_EQUAL(1, a.nSwipes);
+  TEST_ASSERT_EQUAL(static_cast<int>(pantallas::Direccion::ARRIBA),
+                    static_cast<int>(a.ultDir));
+
+  g.encolarEvento({TipoEventoUi::SWIPE_ABAJO, 100, 120});
+  g.tick(2000);
+  TEST_ASSERT_EQUAL(2, a.nSwipes);
+  TEST_ASSERT_EQUAL(static_cast<int>(pantallas::Direccion::ABAJO),
+                    static_cast<int>(a.ultDir));
+}
+
+void test_swipe_vertical_ignorado_con_pila_ui(void) {
+  RendererFake r;
+  PantallaFake home("Home", 10);
+  PantallaFake a("A", 0), sub("Sub", 99);
+  GestorPantallas g(r);
+  g.setHome(&home);
+  g.registrar(&home); g.registrar(&a); g.registrar(&sub);
+  g.configurarModo(ModoGestor::CARRUSEL, 60, {0}, 0);
+  g.iniciar(0);
+  g.mostrarPorId(0);
+  g.abrirEnPila(&sub);
+
+  g.encolarEvento({TipoEventoUi::SWIPE_ARRIBA, 100, 120});
+  g.tick(1000);
+  TEST_ASSERT_EQUAL(0, sub.nSwipes);
+  TEST_ASSERT_EQUAL(0, a.nSwipes);
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_modo_carrusel_rota_al_pasar_el_intervalo);
@@ -177,5 +218,7 @@ int main(int, char**) {
   RUN_TEST(test_pila_ui_pausa_el_carrusel);
   RUN_TEST(test_tap_fuera_de_barra_menu_se_delega_con_offset_correcto);
   RUN_TEST(test_tap_en_barra_fuera_del_boton_menu_se_ignora);
+  RUN_TEST(test_swipe_vertical_se_delega_a_pantalla_actual);
+  RUN_TEST(test_swipe_vertical_ignorado_con_pila_ui);
   return UNITY_END();
 }
