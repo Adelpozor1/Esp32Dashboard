@@ -71,7 +71,7 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
   std::vector<Partido> ultimos;
   if (!http_.get(URL_PAST, body, status, 20000) || status != 200 || body.empty()) {
 #ifdef ARDUINO
-    ::Serial.printf("[futbol] past fallo status=%d body=%u\n", status, (unsigned)body.size());
+    ::Serial.printf("[futbol] past fallo status=%d body=%u:%s\n", status, (unsigned)body.size(), body.substr(0, 200).c_str());
 #endif
     return false;
   }

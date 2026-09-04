@@ -171,16 +171,23 @@ void tareaMeteoRefresh(void*) {
   }
 }
 
-void tareaFutbolRefresh(void*) {
-  FutbolClient cliente(g_http);
-  vTaskDelay(pdMS_TO_TICKS(10000));   // gracia inicial más larga que meteo
+// Los 3 clientes deportivos usan HTTPS con WiFiClientSecure (~35 KB heap durante
+// el handshake). Ejecutarlos en tasks concurrentes sobrecarga el heap y dispara
+// el WDT. Se agrupan en una sola task secuencial con pausas para que el heap
+// se libere entre peticiones.
+void tareaDeportesRefresh(void*) {
+  FutbolClient cliFut(g_http);
+  MotogpClient cliMot(g_http);
+  F1Client     cliF1(g_http);
+  vTaskDelay(pdMS_TO_TICKS(15000));   // gracia inicial (deja que meteo acabe)
   for (;;) {
     if (WiFi.status() == WL_CONNECTED) {
-      FutbolSnapshot nuevo;
-      if (cliente.fetch(nuevo)) {
-        nuevo.obtenido_ms = millis();
-        nuevo.stale = false;
-        g_snapFutbol = nuevo;
+      // --- Fútbol ---
+      FutbolSnapshot nf;
+      if (cliFut.fetch(nf)) {
+        nf.obtenido_ms = millis();
+        nf.stale = false;
+        g_snapFutbol = nf;
         Serial.printf("[futbol] refresh OK ultimos=%d proximos=%d\n",
                       (int)g_snapFutbol.ultimos.size(),
                       (int)g_snapFutbol.proximos.size());
@@ -188,21 +195,14 @@ void tareaFutbolRefresh(void*) {
         g_snapFutbol.stale = true;
         Serial.println("[futbol] refresh FALLO");
       }
-    }
-    vTaskDelay(pdMS_TO_TICKS(3UL * 3600UL * 1000UL));  // 3 h
-  }
-}
+      vTaskDelay(pdMS_TO_TICKS(5000));
 
-void tareaMotogpRefresh(void*) {
-  MotogpClient cliente(g_http);
-  vTaskDelay(pdMS_TO_TICKS(15000));   // gracia
-  for (;;) {
-    if (WiFi.status() == WL_CONNECTED) {
-      MotogpSnapshot nuevo;
-      if (cliente.fetch(nuevo)) {
-        nuevo.obtenido_ms = millis();
-        nuevo.stale = false;
-        g_snapMotogp = nuevo;
+      // --- MotoGP ---
+      MotogpSnapshot nm;
+      if (cliMot.fetch(nm)) {
+        nm.obtenido_ms = millis();
+        nm.stale = false;
+        g_snapMotogp = nm;
         Serial.printf("[motogp] refresh OK ultimos=%d proximos=%d\n",
                       (int)g_snapMotogp.ultimos.size(),
                       (int)g_snapMotogp.proximos.size());
@@ -210,21 +210,14 @@ void tareaMotogpRefresh(void*) {
         g_snapMotogp.stale = true;
         Serial.println("[motogp] refresh FALLO");
       }
-    }
-    vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));  // 6 h
-  }
-}
+      vTaskDelay(pdMS_TO_TICKS(5000));
 
-void tareaF1Refresh(void*) {
-  F1Client cliente(g_http);
-  vTaskDelay(pdMS_TO_TICKS(20000));   // gracia
-  for (;;) {
-    if (WiFi.status() == WL_CONNECTED) {
-      F1Snapshot nuevo;
-      if (cliente.fetch(nuevo)) {
-        nuevo.obtenido_ms = millis();
-        nuevo.stale = false;
-        g_snapF1 = nuevo;
+      // --- F1 ---
+      F1Snapshot n1;
+      if (cliF1.fetch(n1)) {
+        n1.obtenido_ms = millis();
+        n1.stale = false;
+        g_snapF1 = n1;
         Serial.printf("[f1] refresh OK ultima=%s proximas=%d\n",
                       g_snapF1.ultima.nombreGp.c_str(),
                       (int)g_snapF1.proximas.size());
@@ -233,7 +226,7 @@ void tareaF1Refresh(void*) {
         Serial.println("[f1] refresh FALLO");
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));   // 6 h
+    vTaskDelay(pdMS_TO_TICKS(3UL * 3600UL * 1000UL));   // 3 h (frecuencia dominante = fútbol)
   }
 }
 
@@ -316,9 +309,7 @@ void modoRadar() {
   xTaskCreatePinnedToCore(tareaPoller,  "poller",  8192, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaDisplay, "display", 4096, nullptr, 1, nullptr, 1);
   xTaskCreatePinnedToCore(tareaMeteoRefresh, "meteo", 6144, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(tareaFutbolRefresh, "futbol", 8192, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(tareaMotogpRefresh, "motogp", 8192, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(tareaF1Refresh, "f1", 10240, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaDeportesRefresh, "deportes", 12288, nullptr, 1, nullptr, 0);
   Serial.println("[radar] modo operativo con carrusel");
 }
 

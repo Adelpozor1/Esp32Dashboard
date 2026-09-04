@@ -13,20 +13,25 @@ bool WifiHttpClient::get(const std::string& url,
   statusOut = 0;
   HTTPClient http;
   http.setTimeout(timeoutMs);
-  // Nominatim exige User-Agent identificable.
-  http.setUserAgent("radar-vuelos-esp32/1.0 (albertodelpozo)");
-  // TheSportsDB y Jolpica redirigen HTTP -> HTTPS con 301. Sin esto, el cliente
-  // devuelve 301 sin seguir. Open-Meteo no redirige, así que no afecta.
-  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+  // Cloudflare (TheSportsDB, Jolpica) bloquea user-agents "bot-like".
+  http.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0");
+
+  // El WiFiClientSecure debe seguir vivo hasta que http.end() termine.
+  // Si se declara dentro del `if`, sale de scope antes de http.GET() y
+  // HTTPClient acaba mandando plain HTTP al puerto 443 (bug reportado por
+  // el propio nginx: "plain HTTP request was sent to HTTPS port").
+  WiFiClientSecure secureClient;
   bool ok;
   if (url.rfind("https://", 0) == 0) {
-    WiFiClientSecure client;
-    client.setInsecure();  // Sin validación de certificado (aceptable para APIs públicas de solo lectura).
-    ok = http.begin(client, url.c_str());
+    secureClient.setInsecure();  // Sin validación de cert (aceptable para APIs de solo lectura).
+    ok = http.begin(secureClient, url.c_str());
   } else {
     ok = http.begin(url.c_str());
   }
   if (!ok) return false;
+
+  http.addHeader("Accept", "application/json");
+  http.addHeader("Accept-Encoding", "identity");
   int code = http.GET();
   statusOut = code;
   if (code <= 0) { http.end(); return false; }
