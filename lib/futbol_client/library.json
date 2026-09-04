@@ -1,0 +1,8 @@
+{
+  "name": "futbol_client",
+  "version": "0.1.0",
+  "description": "Cliente TheSportsDB para eventos de La Liga (id=4335)",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.0.4"
+  }
+}
