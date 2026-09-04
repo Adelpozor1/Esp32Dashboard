@@ -1,0 +1,8 @@
+{
+  "name": "pantalla_futbol",
+  "version": "0.1.0",
+  "description": "Vista Fútbol Liga con sub-vistas Últimos/Próximos alternables por swipe vertical",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43"
+  }
+}
