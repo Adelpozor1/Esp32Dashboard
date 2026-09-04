@@ -19,8 +19,9 @@ int parseDiaMes(const char* iso) {
 }  // namespace
 
 IconoMeteo MeteoClient::categoria(int wmo) {
-  if (wmo == 0) return IconoMeteo::SOL;
-  if (wmo >= 1 && wmo <= 3) return IconoMeteo::NUBE;
+  if (wmo == 0 || wmo == 1) return IconoMeteo::SOL;        // clear / mainly clear
+  if (wmo == 2)             return IconoMeteo::SOL_NUBE;   // partly cloudy
+  if (wmo == 3)             return IconoMeteo::NUBE;       // overcast
   if (wmo == 45 || wmo == 48) return IconoMeteo::NIEBLA;
   if ((wmo >= 51 && wmo <= 67) || (wmo >= 80 && wmo <= 82)) return IconoMeteo::LLUVIA;
   if ((wmo >= 71 && wmo <= 77) || wmo == 85 || wmo == 86) return IconoMeteo::NIEVE;

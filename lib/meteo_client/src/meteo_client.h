@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-enum class IconoMeteo : uint8_t { SOL=0, NUBE=1, LLUVIA=2, NIEVE=3, TORMENTA=4, NIEBLA=5 };
+enum class IconoMeteo : uint8_t { SOL=0, NUBE=1, LLUVIA=2, NIEVE=3, TORMENTA=4, NIEBLA=5, SOL_NUBE=6 };
 
 struct MeteoSnapshot {
   bool     ok = false;

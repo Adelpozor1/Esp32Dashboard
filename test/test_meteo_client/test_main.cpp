@@ -54,15 +54,38 @@ void test_parsear_sin_hourly(void) {
   TEST_ASSERT_EQUAL(1, (int)s.dias.size());
 }
 
-void test_categoria_wmo_95_es_tormenta(void) {
-  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::TORMENTA),
-                    static_cast<int>(MeteoClient::categoria(95)));
+void test_categoria_mapeo_wmo_correcto(void) {
+  // Clear / mainly clear -> SOL
   TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::SOL),
                     static_cast<int>(MeteoClient::categoria(0)));
-  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::LLUVIA),
-                    static_cast<int>(MeteoClient::categoria(61)));
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::SOL),
+                    static_cast<int>(MeteoClient::categoria(1)));
+  // Partly cloudy -> SOL_NUBE
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::SOL_NUBE),
+                    static_cast<int>(MeteoClient::categoria(2)));
+  // Overcast -> NUBE
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::NUBE),
+                    static_cast<int>(MeteoClient::categoria(3)));
+  // Niebla
   TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::NIEBLA),
                     static_cast<int>(MeteoClient::categoria(45)));
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::NIEBLA),
+                    static_cast<int>(MeteoClient::categoria(48)));
+  // Lluvia
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::LLUVIA),
+                    static_cast<int>(MeteoClient::categoria(61)));
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::LLUVIA),
+                    static_cast<int>(MeteoClient::categoria(80)));
+  // Nieve
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::NIEVE),
+                    static_cast<int>(MeteoClient::categoria(71)));
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::NIEVE),
+                    static_cast<int>(MeteoClient::categoria(85)));
+  // Tormenta
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::TORMENTA),
+                    static_cast<int>(MeteoClient::categoria(95)));
+  TEST_ASSERT_EQUAL(static_cast<int>(IconoMeteo::TORMENTA),
+                    static_cast<int>(MeteoClient::categoria(99)));
 }
 
 int main(int, char**) {
@@ -70,6 +93,6 @@ int main(int, char**) {
   RUN_TEST(test_parsear_payload_valido);
   RUN_TEST(test_parsear_json_malformado);
   RUN_TEST(test_parsear_sin_hourly);
-  RUN_TEST(test_categoria_wmo_95_es_tormenta);
+  RUN_TEST(test_categoria_mapeo_wmo_correcto);
   return UNITY_END();
 }

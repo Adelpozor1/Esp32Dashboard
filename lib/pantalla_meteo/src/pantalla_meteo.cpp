@@ -208,5 +208,28 @@ void PantallaMeteo::dibujarIcono(TFT_eSPI& tft, int cx, int cy, int lado, int wm
       }
       break;
     }
+    case IconoMeteo::SOL_NUBE: {
+      // Sol amarillo pequeño arriba-izquierda + nube gris solapando abajo-derecha.
+      const int rSol = r - 2;
+      const int solCx = cx - r / 2;
+      const int solCy = cy - r / 3;
+      tft.fillCircle(solCx, solCy, rSol, COL_SOL);
+      for (int a = 0; a < 360; a += 60) {
+        const double rad = a * M_PI / 180.0;
+        const int x1 = solCx + int((rSol + 2) * std::cos(rad));
+        const int y1 = solCy + int((rSol + 2) * std::sin(rad));
+        const int x2 = solCx + int((rSol + lado / 8) * std::cos(rad));
+        const int y2 = solCy + int((rSol + lado / 8) * std::sin(rad));
+        tft.drawLine(x1, y1, x2, y2, COL_SOL);
+      }
+      // Nube (más a la derecha y abajo, solapando el sol)
+      const int nCx = cx + r / 3;
+      const int nCy = cy + r / 4;
+      tft.fillCircle(nCx - r / 2, nCy - 1, r / 2 + 1, COL_NUBE);
+      tft.fillCircle(nCx + r / 2, nCy - 1, r / 2 + 1, COL_NUBE);
+      tft.fillCircle(nCx, nCy - r / 2, r / 2 + 1, COL_NUBE);
+      tft.fillRect(nCx - r, nCy - 1, 2 * r, r / 2 + 1, COL_NUBE);
+      break;
+    }
   }
 }
