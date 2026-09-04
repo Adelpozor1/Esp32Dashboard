@@ -5,9 +5,11 @@
 namespace touch {
 
 enum class TipoEvento : uint8_t {
-  TAP = 0,
+  TAP             = 0,
   SWIPE_IZQUIERDA = 1,
   SWIPE_DERECHA   = 2,
+  SWIPE_ARRIBA    = 3,
+  SWIPE_ABAJO     = 4,
 };
 
 struct EventoTactil {
@@ -21,12 +23,13 @@ struct EventoTactil {
 // Devuelve un evento gesto si el release cierra un patrón reconocido.
 //
 // Umbrales (comparaciones estrictas):
-//   TAP:   duración < 300 ms, |dx| < 20 px, |dy| < 20 px.
-//   SWIPE: |dx| > 60 px, |dx| > |dy|, duración < 400 ms.
+//   TAP:            duración < 300 ms, |dx| < 20 px, |dy| < 20 px.
+//   SWIPE horiz:    duración < 400 ms, |dx| > 60 px, |dx| > |dy|.
+//   SWIPE vertical: duración < 400 ms, |dy| > 60 px, |dy| >= |dx|.
 //
-// Nota: el intervalo |dx| ∈ [20, 60] con dy pequeño es un dead zone intencional
-// (ni TAP ni SWIPE). Los tests fijan estos bordes; no cambiar `<`↔`<=` sin
-// actualizar tests.
+// Nota: el intervalo |dx| (o |dy|) ∈ [20, 60] con el otro eje pequeño es un
+// dead zone intencional (ni TAP ni SWIPE). Los tests fijan estos bordes;
+// no cambiar `<`↔`<=` sin actualizar tests.
 class GestureDetector {
  public:
   void onPress(int16_t x, int16_t y, uint32_t ms);

@@ -17,9 +17,16 @@ std::optional<EventoTactil> GestureDetector::onRelease(int16_t x, int16_t y, uin
   if (dur < UMBRAL_TAP_MS && std::abs(dx) < UMBRAL_TAP_PX && std::abs(dy) < UMBRAL_TAP_PX) {
     return EventoTactil{TipoEvento::TAP, x0_, y0_};
   }
-  if (dur < UMBRAL_SWIPE_MS && std::abs(dx) > UMBRAL_SWIPE_PX && std::abs(dx) > std::abs(dy)) {
-    return EventoTactil{dx > 0 ? TipoEvento::SWIPE_DERECHA : TipoEvento::SWIPE_IZQUIERDA,
-                        x0_, y0_};
+  if (dur < UMBRAL_SWIPE_MS) {
+    const bool horiz = std::abs(dx) > std::abs(dy);
+    if (horiz && std::abs(dx) > UMBRAL_SWIPE_PX) {
+      return EventoTactil{dx > 0 ? TipoEvento::SWIPE_DERECHA : TipoEvento::SWIPE_IZQUIERDA,
+                          x0_, y0_};
+    }
+    if (!horiz && std::abs(dy) > UMBRAL_SWIPE_PX) {
+      return EventoTactil{dy > 0 ? TipoEvento::SWIPE_ABAJO : TipoEvento::SWIPE_ARRIBA,
+                          x0_, y0_};
+    }
   }
   return std::nullopt;
 }

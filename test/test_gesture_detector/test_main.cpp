@@ -45,10 +45,10 @@ void test_swipe_izquierda_produce_evento(void) {
   TEST_ASSERT_EQUAL(static_cast<int>(TipoEvento::SWIPE_IZQUIERDA), static_cast<int>(ev->tipo));
 }
 
-void test_swipe_vertical_no_produce_evento(void) {
+void test_swipe_vertical_muy_lento_no_produce_evento(void) {
   GestureDetector g;
   g.onPress(100, 20, 1000);
-  auto ev = g.onRelease(105, 180, 1200);  // dy grande, dx pequeño
+  auto ev = g.onRelease(105, 180, 1500);  // dy=160, dx=5, dur=500 > umbral 400
   TEST_ASSERT_FALSE(ev.has_value());
 }
 
@@ -96,6 +96,38 @@ void test_bordes_exactos_de_umbral_son_estrictos(void) {
   TEST_ASSERT_FALSE(ev2.has_value());
 }
 
+void test_swipe_arriba_produce_evento(void) {
+  GestureDetector g;
+  g.onPress(100, 200, 1000);
+  auto ev = g.onRelease(105, 100, 1200);   // dy=-100 rápido
+  TEST_ASSERT_TRUE(ev.has_value());
+  TEST_ASSERT_EQUAL(static_cast<int>(TipoEvento::SWIPE_ARRIBA), static_cast<int>(ev->tipo));
+}
+
+void test_swipe_abajo_produce_evento(void) {
+  GestureDetector g;
+  g.onPress(100, 40, 1000);
+  auto ev = g.onRelease(95, 180, 1200);    // dy=+140
+  TEST_ASSERT_TRUE(ev.has_value());
+  TEST_ASSERT_EQUAL(static_cast<int>(TipoEvento::SWIPE_ABAJO), static_cast<int>(ev->tipo));
+}
+
+void test_swipe_diagonal_predomina_vertical(void) {
+  GestureDetector g;
+  g.onPress(100, 40, 1000);
+  auto ev = g.onRelease(140, 140, 1200);   // dx=40, dy=100 -> vertical
+  TEST_ASSERT_TRUE(ev.has_value());
+  TEST_ASSERT_EQUAL(static_cast<int>(TipoEvento::SWIPE_ABAJO), static_cast<int>(ev->tipo));
+}
+
+void test_swipe_horizontal_no_es_vertical(void) {
+  GestureDetector g;
+  g.onPress(20, 100, 1000);
+  auto ev = g.onRelease(180, 130, 1200);   // dx=160, dy=30 -> horizontal
+  TEST_ASSERT_TRUE(ev.has_value());
+  TEST_ASSERT_EQUAL(static_cast<int>(TipoEvento::SWIPE_DERECHA), static_cast<int>(ev->tipo));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_tap_corto_produce_evento_tap);
@@ -103,11 +135,15 @@ int main(int, char**) {
   RUN_TEST(test_desplazamiento_grande_no_es_tap);
   RUN_TEST(test_swipe_derecha_produce_evento);
   RUN_TEST(test_swipe_izquierda_produce_evento);
-  RUN_TEST(test_swipe_vertical_no_produce_evento);
+  RUN_TEST(test_swipe_vertical_muy_lento_no_produce_evento);
   RUN_TEST(test_swipe_muy_lento_no_produce_evento);
   RUN_TEST(test_release_sin_press_devuelve_nullopt);
   RUN_TEST(test_release_doble_consecutivo_devuelve_nullopt);
   RUN_TEST(test_dead_zone_entre_tap_y_swipe);
   RUN_TEST(test_bordes_exactos_de_umbral_son_estrictos);
+  RUN_TEST(test_swipe_arriba_produce_evento);
+  RUN_TEST(test_swipe_abajo_produce_evento);
+  RUN_TEST(test_swipe_diagonal_predomina_vertical);
+  RUN_TEST(test_swipe_horizontal_no_es_vertical);
   return UNITY_END();
 }
