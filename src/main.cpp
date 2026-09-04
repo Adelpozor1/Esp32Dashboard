@@ -126,6 +126,8 @@ void tareaDisplay(void*) {
         case touch::TipoEvento::TAP:              u.tipo = pantallas::TipoEventoUi::TAP; break;
         case touch::TipoEvento::SWIPE_IZQUIERDA:  u.tipo = pantallas::TipoEventoUi::SWIPE_IZQUIERDA; break;
         case touch::TipoEvento::SWIPE_DERECHA:    u.tipo = pantallas::TipoEventoUi::SWIPE_DERECHA; break;
+        case touch::TipoEvento::SWIPE_ARRIBA:     u.tipo = pantallas::TipoEventoUi::SWIPE_ARRIBA; break;
+        case touch::TipoEvento::SWIPE_ABAJO:      u.tipo = pantallas::TipoEventoUi::SWIPE_ABAJO;  break;
       }
       u.x = ev.x; u.y = ev.y;
       g_gestor->encolarEvento(u);
