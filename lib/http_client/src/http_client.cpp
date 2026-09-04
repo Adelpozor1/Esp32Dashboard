@@ -15,6 +15,9 @@ bool WifiHttpClient::get(const std::string& url,
   http.setTimeout(timeoutMs);
   // Nominatim exige User-Agent identificable.
   http.setUserAgent("radar-vuelos-esp32/1.0 (albertodelpozo)");
+  // TheSportsDB y Jolpica redirigen HTTP -> HTTPS con 301. Sin esto, el cliente
+  // devuelve 301 sin seguir. Open-Meteo no redirige, así que no afecta.
+  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
   bool ok;
   if (url.rfind("https://", 0) == 0) {
     WiFiClientSecure client;
