@@ -27,6 +27,8 @@
 #include "futbol_client.h"
 #include "pantalla_motogp.h"
 #include "motogp_client.h"
+#include "pantalla_f1.h"
+#include "f1_client.h"
 #include "pantalla_ajustes.h"
 #include "pantalla_intervalo.h"
 #include "pantalla_seleccion_vistas.h"
@@ -46,6 +48,7 @@ uint32_t        g_ultimoIntentoWifiMs = 0;
 MeteoSnapshot   g_snapMeteo;
 FutbolSnapshot  g_snapFutbol;
 MotogpSnapshot  g_snapMotogp;
+F1Snapshot      g_snapF1;
 
 // Renderer real: barra superior con "menú" a la izquierda, título centrado, dots
 // del carrusel abajo-derecha del área de contenido.
@@ -212,6 +215,28 @@ void tareaMotogpRefresh(void*) {
   }
 }
 
+void tareaF1Refresh(void*) {
+  F1Client cliente(g_http);
+  vTaskDelay(pdMS_TO_TICKS(20000));   // gracia
+  for (;;) {
+    if (WiFi.status() == WL_CONNECTED) {
+      F1Snapshot nuevo;
+      if (cliente.fetch(nuevo)) {
+        nuevo.obtenido_ms = millis();
+        nuevo.stale = false;
+        g_snapF1 = nuevo;
+        Serial.printf("[f1] refresh OK ultima=%s proximas=%d\n",
+                      g_snapF1.ultima.nombreGp.c_str(),
+                      (int)g_snapF1.proximas.size());
+      } else {
+        g_snapF1.stale = true;
+        Serial.println("[f1] refresh FALLO");
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));   // 6 h
+  }
+}
+
 void arrancarTouch() {
   touch::CalibracionTouch cal{g_cfg.touch_min_x, g_cfg.touch_max_x,
                               g_cfg.touch_min_y, g_cfg.touch_max_y,
@@ -235,7 +260,7 @@ void modoRadar() {
   auto* meteo   = new PantallaMeteo(g_snapMeteo);
   auto* futbol  = new PantallaFutbol(g_snapFutbol);
   auto* motogp  = new PantallaMotogp(g_snapMotogp);
-  auto* f1      = new PantallaProximamente(5, "F1");
+  auto* f1      = new PantallaF1(g_snapF1);
 
   static pantallas::GestorPantallas gestor(g_renderer);
   g_gestor = &gestor;
@@ -293,6 +318,7 @@ void modoRadar() {
   xTaskCreatePinnedToCore(tareaMeteoRefresh, "meteo", 6144, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaFutbolRefresh, "futbol", 8192, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaMotogpRefresh, "motogp", 8192, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaF1Refresh, "f1", 10240, nullptr, 1, nullptr, 0);
   Serial.println("[radar] modo operativo con carrusel");
 }
 
