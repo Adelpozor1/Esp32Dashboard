@@ -1,0 +1,8 @@
+{
+  "name": "pantalla_f1",
+  "version": "0.1.0",
+  "description": "Vista F1 con sub-vistas última carrera y calendario",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43"
+  }
+}
