@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifdef ARDUINO
+#include <Arduino.h>
+#endif
 
 namespace {
 int parseHora(const char* iso) {
@@ -79,7 +82,7 @@ bool MeteoClient::parsear(const std::string& json, MeteoSnapshot& out) {
 bool MeteoClient::fetch(double lat, double lon, MeteoSnapshot& out) {
   char url[512];
   std::snprintf(url, sizeof(url),
-                "https://api.open-meteo.com/v1/forecast"
+                "http://api.open-meteo.com/v1/forecast"
                 "?latitude=%.4f&longitude=%.4f"
                 "&current_weather=true"
                 "&hourly=temperature_2m,weather_code"
@@ -88,10 +91,27 @@ bool MeteoClient::fetch(double lat, double lon, MeteoSnapshot& out) {
                 lat, lon);
   std::string body;
   int status = 0;
-  if (!http_.get(url, body, status, 15000)) return false;
-  if (status != 200 || body.empty()) return false;
+  if (!http_.get(url, body, status, 20000)) {
+#ifdef ARDUINO
+    ::Serial.printf("[meteo] http.get fallo (status=%d body=%u)\n",
+                    status, (unsigned)body.size());
+#endif
+    return false;
+  }
+  if (status != 200 || body.empty()) {
+#ifdef ARDUINO
+    ::Serial.printf("[meteo] respuesta inutil (status=%d body=%u)\n",
+                    status, (unsigned)body.size());
+#endif
+    return false;
+  }
   MeteoSnapshot tmp;
-  if (!parsear(body, tmp)) return false;
+  if (!parsear(body, tmp)) {
+#ifdef ARDUINO
+    ::Serial.println("[meteo] parseo JSON fallo");
+#endif
+    return false;
+  }
   out = tmp;
   return true;
 }
