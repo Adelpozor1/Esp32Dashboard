@@ -46,8 +46,8 @@ bool MotogpClient::parsearEventos(const std::string& json,
 }
 
 bool MotogpClient::fetch(MotogpSnapshot& out) {
-  const char* URL_PAST = "http://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4407";
-  const char* URL_NEXT = "http://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4407";
+  const char* URL_PAST = "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4407";
+  const char* URL_NEXT = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4407";
   std::string body; int status = 0;
 
   std::vector<EventoMotor> ultimos;

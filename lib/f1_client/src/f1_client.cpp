@@ -86,8 +86,8 @@ bool F1Client::parsearCalendario(const std::string& json,
 }
 
 bool F1Client::fetch(F1Snapshot& out) {
-  const char* URL_LAST     = "http://api.jolpi.ca/ergast/f1/current/last/results.json";
-  const char* URL_CURRENT  = "http://api.jolpi.ca/ergast/f1/current.json";
+  const char* URL_LAST     = "https://api.jolpi.ca/ergast/f1/current/last/results.json";
+  const char* URL_CURRENT  = "https://api.jolpi.ca/ergast/f1/current.json";
 
   std::string body; int status = 0;
 

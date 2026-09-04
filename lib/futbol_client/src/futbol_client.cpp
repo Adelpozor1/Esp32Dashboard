@@ -62,8 +62,8 @@ bool FutbolClient::parsearEventos(const std::string& json,
 }
 
 bool FutbolClient::fetch(FutbolSnapshot& out) {
-  const char* URL_PAST = "http://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4335";
-  const char* URL_NEXT = "http://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4335";
+  const char* URL_PAST = "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4335";
+  const char* URL_NEXT = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4335";
 
   std::string body;
   int status = 0;
