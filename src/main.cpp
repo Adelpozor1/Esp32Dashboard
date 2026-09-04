@@ -23,6 +23,8 @@
 #include "pantalla_reloj.h"
 #include "pantalla_meteo.h"
 #include "meteo_client.h"
+#include "pantalla_futbol.h"
+#include "futbol_client.h"
 #include "pantalla_ajustes.h"
 #include "pantalla_intervalo.h"
 #include "pantalla_seleccion_vistas.h"
@@ -40,6 +42,7 @@ Config          g_cfg;
 RadarState*     g_estado = nullptr;
 uint32_t        g_ultimoIntentoWifiMs = 0;
 MeteoSnapshot   g_snapMeteo;
+FutbolSnapshot  g_snapFutbol;
 
 // Renderer real: barra superior con "menú" a la izquierda, título centrado, dots
 // del carrusel abajo-derecha del área de contenido.
@@ -162,6 +165,28 @@ void tareaMeteoRefresh(void*) {
   }
 }
 
+void tareaFutbolRefresh(void*) {
+  FutbolClient cliente(g_http);
+  vTaskDelay(pdMS_TO_TICKS(10000));   // gracia inicial más larga que meteo
+  for (;;) {
+    if (WiFi.status() == WL_CONNECTED) {
+      FutbolSnapshot nuevo;
+      if (cliente.fetch(nuevo)) {
+        nuevo.obtenido_ms = millis();
+        nuevo.stale = false;
+        g_snapFutbol = nuevo;
+        Serial.printf("[futbol] refresh OK ultimos=%d proximos=%d\n",
+                      (int)g_snapFutbol.ultimos.size(),
+                      (int)g_snapFutbol.proximos.size());
+      } else {
+        g_snapFutbol.stale = true;
+        Serial.println("[futbol] refresh FALLO");
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(3UL * 3600UL * 1000UL));  // 3 h
+  }
+}
+
 void arrancarTouch() {
   touch::CalibracionTouch cal{g_cfg.touch_min_x, g_cfg.touch_max_x,
                               g_cfg.touch_min_y, g_cfg.touch_max_y,
@@ -183,7 +208,7 @@ void modoRadar() {
   auto* radar   = new PantallaRadar(*g_estado);
   auto* reloj   = new PantallaReloj();
   auto* meteo   = new PantallaMeteo(g_snapMeteo);
-  auto* futbol  = new PantallaProximamente(3, "Futbol");
+  auto* futbol  = new PantallaFutbol(g_snapFutbol);
   auto* motogp  = new PantallaProximamente(4, "MotoGP");
   auto* f1      = new PantallaProximamente(5, "F1");
 
@@ -241,6 +266,7 @@ void modoRadar() {
   xTaskCreatePinnedToCore(tareaPoller,  "poller",  8192, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaDisplay, "display", 4096, nullptr, 1, nullptr, 1);
   xTaskCreatePinnedToCore(tareaMeteoRefresh, "meteo", 6144, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaFutbolRefresh, "futbol", 8192, nullptr, 1, nullptr, 0);
   Serial.println("[radar] modo operativo con carrusel");
 }
 
