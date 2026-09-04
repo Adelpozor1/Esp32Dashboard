@@ -1,0 +1,8 @@
+{
+  "name": "pantalla_meteo",
+  "version": "0.1.0",
+  "description": "Vista Meteo con sub-vistas Horas/Días alternables por swipe vertical",
+  "dependencies": {
+    "bodmer/TFT_eSPI": "^2.5.43"
+  }
+}
