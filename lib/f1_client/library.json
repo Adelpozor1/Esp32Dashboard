@@ -1,0 +1,8 @@
+{
+  "name": "f1_client",
+  "version": "0.1.0",
+  "description": "Cliente Jolpica-F1 (sucesor de Ergast) para calendario y última carrera",
+  "dependencies": {
+    "bblanchon/ArduinoJson": "^7.0.4"
+  }
+}
