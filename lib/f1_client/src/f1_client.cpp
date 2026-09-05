@@ -109,22 +109,14 @@ bool F1Client::parsearClasificacion(const std::string& json,
 }
 
 bool F1Client::fetch(F1Snapshot& out) {
-  const char* URL_LAST      = "https://api.jolpi.ca/ergast/f1/current/last/results.json";
   const char* URL_CURRENT   = "https://api.jolpi.ca/ergast/f1/current.json?limit=15";
   const char* URL_STANDINGS = "https://api.jolpi.ca/ergast/f1/current/driverstandings.json?limit=10";
 
   std::string body; int status = 0;
 
-  if (!http_.get(URL_LAST, body, status, 20000) || status != 200 || body.empty()) {
-#ifdef ARDUINO
-    ::Serial.printf("[f1] last fallo status=%d body=%u\n", status, (unsigned)body.size());
-#endif
-    return false;
-  }
-  F1Carrera ultima; std::vector<F1Piloto> podio;
-  if (!parsearUltima(body, ultima, podio)) return false;
-
-  body.clear();
+  // NOTA: ya no se pide `current/last/results` porque la vista no muestra el
+  // podio de la última carrera. Ahorra un TLS handshake y ~10 KB de body.
+  // Los campos snap.ultima y snap.podio quedan vacíos por diseño.
   if (!http_.get(URL_CURRENT, body, status, 20000) || status != 200 || body.empty()) {
 #ifdef ARDUINO
     ::Serial.printf("[f1] current fallo status=%d body=%u\n", status, (unsigned)body.size());
@@ -134,8 +126,6 @@ bool F1Client::fetch(F1Snapshot& out) {
   std::vector<F1Carrera> proximas;
   if (!parsearCalendario(body, proximas, 5)) return false;
 
-  out.ultima = std::move(ultima);
-  out.podio = std::move(podio);
   out.proximas = std::move(proximas);
 
   body.clear();
