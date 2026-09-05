@@ -85,9 +85,33 @@ bool F1Client::parsearCalendario(const std::string& json,
   return true;
 }
 
+bool F1Client::parsearClasificacion(const std::string& json,
+                                    std::vector<F1PilotoClas>& out,
+                                    size_t maxN) {
+  out.clear();
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return false;
+  auto sl = doc["MRData"]["StandingsTable"]["StandingsLists"].as<JsonArrayConst>();
+  if (sl.isNull() || sl.size() == 0) return false;
+  auto ds = sl[0]["DriverStandings"].as<JsonArrayConst>();
+  if (ds.isNull()) return false;
+  for (JsonVariantConst r : ds) {
+    if (out.size() >= maxN) break;
+    F1PilotoClas p;
+    p.posicion = atoi(valOrEmpty(r["position"]).c_str());
+    p.nombre = valOrEmpty(r["Driver"]["familyName"]);
+    auto cons = r["Constructors"].as<JsonArrayConst>();
+    if (!cons.isNull() && cons.size() > 0) p.equipo = valOrEmpty(cons[0]["name"]);
+    p.puntos = atoi(valOrEmpty(r["points"]).c_str());
+    out.push_back(p);
+  }
+  return true;
+}
+
 bool F1Client::fetch(F1Snapshot& out) {
-  const char* URL_LAST     = "https://api.jolpi.ca/ergast/f1/current/last/results.json";
-  const char* URL_CURRENT  = "https://api.jolpi.ca/ergast/f1/current.json?limit=15";
+  const char* URL_LAST      = "https://api.jolpi.ca/ergast/f1/current/last/results.json";
+  const char* URL_CURRENT   = "https://api.jolpi.ca/ergast/f1/current.json?limit=15";
+  const char* URL_STANDINGS = "https://api.jolpi.ca/ergast/f1/current/driverstandings.json?limit=10";
 
   std::string body; int status = 0;
 
@@ -113,6 +137,20 @@ bool F1Client::fetch(F1Snapshot& out) {
   out.ultima = std::move(ultima);
   out.podio = std::move(podio);
   out.proximas = std::move(proximas);
+
+  body.clear();
+  if (!http_.get(URL_STANDINGS, body, status, 20000) || status != 200 || body.empty()) {
+#ifdef ARDUINO
+    ::Serial.printf("[f1] standings fallo status=%d body=%u\n", status, (unsigned)body.size());
+#endif
+    // No devolvemos false: la clasificación es opcional; la vista se apaña sin ella.
+  } else {
+    std::vector<F1PilotoClas> cls;
+    if (parsearClasificacion(body, cls, 10)) {
+      out.clasificacion = std::move(cls);
+    }
+  }
+
   out.ok = true;
   return true;
 }

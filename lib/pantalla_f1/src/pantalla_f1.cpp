@@ -13,6 +13,21 @@ constexpr int H_CONTENIDO = 220;
 void pintarFondo(TFT_eSPI& tft) {
   tft.fillRect(0, OFFSET_Y, W, H_CONTENIDO, paleta_dark::COL_FONDO);
 }
+
+// Color por escudería (aproximados en RGB565)
+uint16_t colorEscuderia(const std::string& e) {
+  if (e == "Red Bull")                                       return 0x2A5F;  // azul marino
+  if (e == "Mercedes")                                        return 0x0575;  // verde/turquesa
+  if (e == "Ferrari")                                         return 0xF800;  // rojo
+  if (e == "McLaren")                                         return 0xFC00;  // naranja
+  if (e == "Aston Martin")                                    return 0x03E0;  // verde oscuro
+  if (e == "Alpine" || e == "Alpine F1 Team")                 return 0x03BF;  // azul claro
+  if (e == "Williams")                                        return 0x001F;  // azul
+  if (e == "Racing Bulls" || e == "RB" || e == "RB F1 Team")  return 0x2A5F;  // azul marino
+  if (e == "Kick Sauber" || e == "Sauber")                    return 0x07E0;  // verde
+  if (e == "Haas F1 Team" || e == "Haas")                     return 0xFFFF;  // blanco
+  return paleta_dark::COL_ACENTO;
+}
 }  // namespace
 
 std::string PantallaF1::truncar(const std::string& s, size_t n) {
@@ -24,7 +39,7 @@ void PantallaF1::alEntrar() { dirty_ = true; ultObtenidoMs_ = 0; }
 
 void PantallaF1::alDeslizar(pantallas::Direccion dir) {
   if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
-    sub_ = (sub_ == SubVista::ULTIMA) ? SubVista::CALENDARIO : SubVista::ULTIMA;
+    sub_ = (sub_ == SubVista::CLASIFICACION) ? SubVista::CALENDARIO : SubVista::CLASIFICACION;
     dirty_ = true;
   }
 }
@@ -39,8 +54,8 @@ void PantallaF1::dibujar(uint32_t) {
     dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms;
     return;
   }
-  if (sub_ == SubVista::ULTIMA) dibujarUltima(tft);
-  else                           dibujarCalendario(tft);
+  if (sub_ == SubVista::CLASIFICACION) dibujarClasificacion(tft);
+  else                                  dibujarCalendario(tft);
   dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms;
 }
 
@@ -58,8 +73,8 @@ void PantallaF1::dibujarIndicador(TFT_eSPI& tft) {
   const int y = OFFSET_Y + 6;
   const int r = 3;
   const int xA = W - 22, xB = W - 10;
-  const bool ultima = (sub_ == SubVista::ULTIMA);
-  if (ultima) {
+  const bool clas = (sub_ == SubVista::CLASIFICACION);
+  if (clas) {
     tft.fillCircle(xA, y, r, paleta_dark::COL_ACENTO);
     tft.drawCircle(xB, y, r, paleta_dark::COL_TXT_SECUND);
   } else {
@@ -68,54 +83,70 @@ void PantallaF1::dibujarIndicador(TFT_eSPI& tft) {
   }
 }
 
-void PantallaF1::dibujarUltima(TFT_eSPI& tft) {
+void PantallaF1::dibujarClasificacion(TFT_eSPI& tft) {
   pintarFondo(tft);
   dibujarIndicador(tft);
   tft.setTextFont(2);
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
-  tft.print("Ultima carrera");
-  // Nombre GP + circuito
-  tft.setTextFont(2);
-  tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-  tft.setCursor(10, OFFSET_Y + 34);
-  tft.print(truncar(snap_.ultima.nombreGp, 26).c_str());
-  tft.setTextFont(1);
-  tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-  tft.setCursor(10, OFFSET_Y + 54);
-  tft.print(truncar(snap_.ultima.circuito, 40).c_str());
-  // Podio
-  int y = OFFSET_Y + 82;
-  if (snap_.podio.empty()) {
+  tft.print("Mundial");
+
+  if (snap_.clasificacion.empty()) {
     tft.setTextFont(2);
-    tft.setCursor(10, y);
-    tft.print("(sin resultados)");
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    const char* t = "Clasificacion no disponible";
+    int16_t w = tft.textWidth(t);
+    tft.setCursor((W - w) / 2, OFFSET_Y + 100);
+    tft.print(t);
     return;
   }
-  const int n = std::min<int>(3, static_cast<int>(snap_.podio.size()));
+
+  const int n = std::min<int>(4, static_cast<int>(snap_.clasificacion.size()));
+  const int filaAlto = 44;
+  int y = OFFSET_Y + 32;
   for (int i = 0; i < n; ++i) {
-    const auto& p = snap_.podio[i];
-    char pos[4];
-    std::snprintf(pos, sizeof(pos), "%d.", p.posicion);
-    tft.setTextFont(2);
-    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
-    tft.print(pos);
+    const auto& p = snap_.clasificacion[i];
+    // Chip de posición
+    uint16_t col = colorEscuderia(p.equipo);
+    tft.fillRect(10, y, 26, 26, col);
+    // Contraste: si el fondo es muy claro (Haas blanco), texto negro
+    uint16_t colNum = (col == 0xFFFF) ? 0x0000 : 0xFFFF;
+    tft.setTextFont(4);
+    tft.setTextColor(colNum, col);
+    char posStr[4];
+    std::snprintf(posStr, sizeof(posStr), "%d", p.posicion);
+    int16_t wp = tft.textWidth(posStr);
+    tft.setCursor(10 + (26 - wp) / 2, y + 1);
+    tft.print(posStr);
+
+    // Nombre en font 4 blanco
+    tft.setTextFont(4);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    tft.setCursor(38, y);
-    tft.print(truncar(p.nombre, 14).c_str());
+    tft.setCursor(46, y);
+    tft.print(truncar(p.nombre, 12).c_str());
+
+    // Equipo debajo en font 1 gris
     tft.setTextFont(1);
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(38, y + 18);
-    tft.print(truncar(p.equipo, 30).c_str());
-    if (!p.tiempo.empty()) {
-      tft.setTextFont(1);
-      tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-      int16_t wT = tft.textWidth(p.tiempo.c_str());
-      tft.setCursor(W - 10 - wT, y + 8);
-      tft.print(p.tiempo.c_str());
-    }
-    y += 40;
+    tft.setCursor(46, y + 28);
+    tft.print(truncar(p.equipo, 24).c_str());
+
+    // Puntos a la derecha en font 4 acento
+    char ptsStr[8];
+    std::snprintf(ptsStr, sizeof(ptsStr), "%d", p.puntos);
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wpts = tft.textWidth(ptsStr);
+    tft.setCursor(W - 10 - wpts, y);
+    tft.print(ptsStr);
+    // "pts" en font 1 debajo
+    tft.setTextFont(1);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    int16_t wLbl = tft.textWidth("pts");
+    tft.setCursor(W - 10 - wLbl, y + 28);
+    tft.print("pts");
+
+    y += filaAlto;
   }
 }
 
@@ -126,25 +157,40 @@ void PantallaF1::dibujarCalendario(TFT_eSPI& tft) {
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
   tft.print("Calendario");
-  int y = OFFSET_Y + 34;
-  const int n = std::min<int>(5, static_cast<int>(snap_.proximas.size()));
+
+  const int n = std::min<int>(4, static_cast<int>(snap_.proximas.size()));
   if (n == 0) {
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
+    tft.setCursor(10, OFFSET_Y + 100);
     tft.print("(sin datos)");
     return;
   }
+
+  const int cajaAlto = 44;
+  int y = OFFSET_Y + 32;
   for (int i = 0; i < n; ++i) {
     const auto& c = snap_.proximas[i];
+    // Caja
+    tft.drawRect(6, y, W - 12, cajaAlto, paleta_dark::COL_CAJA);
+    // Nombre GP
     tft.setTextFont(2);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
-    tft.print(truncar(c.nombreGp, 26).c_str());
+    tft.setCursor(12, y + 4);
+    tft.print(truncar(c.nombreGp, 22).c_str());
+    // Circuito
     tft.setTextFont(1);
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    int16_t wFH = tft.textWidth(c.fechaHora.c_str());
-    tft.setCursor(W - 10 - wFH, y + 4);
-    tft.print(c.fechaHora.c_str());
-    y += 32;
+    tft.setCursor(12, y + 26);
+    tft.print(truncar(c.circuito, 32).c_str());
+    // Fecha a la derecha en font 2 acento
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    // Mostrar solo YYYY-MM-DD si viene con hora
+    std::string f = c.fechaHora.size() >= 10 ? c.fechaHora.substr(0, 10) : c.fechaHora;
+    int16_t wFH = tft.textWidth(f.c_str());
+    tft.setCursor(W - 16 - wFH, y + 14);
+    tft.print(f.c_str());
+
+    y += cajaAlto + 4;
   }
 }

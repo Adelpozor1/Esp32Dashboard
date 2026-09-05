@@ -17,15 +17,15 @@ class PantallaF1 : public pantallas::Pantalla {
   void dibujar(uint32_t msAhora) override;
 
  private:
-  enum class SubVista : uint8_t { ULTIMA = 0, CALENDARIO = 1 };
+  enum class SubVista : uint8_t { CLASIFICACION = 0, CALENDARIO = 1 };
   void dibujarSinDatos(TFT_eSPI& tft);
-  void dibujarUltima(TFT_eSPI& tft);
+  void dibujarClasificacion(TFT_eSPI& tft);
   void dibujarCalendario(TFT_eSPI& tft);
   void dibujarIndicador(TFT_eSPI& tft);
   static std::string truncar(const std::string& s, size_t n);
 
   const F1Snapshot& snap_;
-  SubVista sub_ = SubVista::ULTIMA;
+  SubVista sub_ = SubVista::CLASIFICACION;
   bool     dirty_ = true;
   uint32_t ultObtenidoMs_ = 0;
 };

@@ -25,7 +25,7 @@ class PantallaMotogp : public pantallas::Pantalla {
   static std::string truncar(const std::string& s, size_t n);
 
   const MotogpSnapshot& snap_;
-  SubVista sub_ = SubVista::ULTIMOS;
+  SubVista sub_ = SubVista::CALENDARIO;
   bool     dirty_ = true;
   uint32_t ultObtenidoMs_ = 0;
 };

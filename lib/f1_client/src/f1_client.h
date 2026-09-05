@@ -18,6 +18,13 @@ struct F1Carrera {
   std::string fechaHora;  // "YYYY-MM-DD HH:MM"
 };
 
+struct F1PilotoClas {
+  int         posicion = 0;    // 1..N
+  std::string nombre;          // familyName
+  std::string equipo;          // constructor name
+  int         puntos = 0;
+};
+
 struct F1Snapshot {
   bool     ok = false;
   uint32_t obtenido_ms = 0;
@@ -25,6 +32,7 @@ struct F1Snapshot {
   F1Carrera ultima;
   std::vector<F1Piloto> podio;
   std::vector<F1Carrera> proximas;
+  std::vector<F1PilotoClas> clasificacion;
 };
 
 class F1Client {
@@ -40,6 +48,10 @@ class F1Client {
   static bool parsearCalendario(const std::string& json,
                                 std::vector<F1Carrera>& proximas,
                                 size_t maxN);
+
+  static bool parsearClasificacion(const std::string& json,
+                                   std::vector<F1PilotoClas>& out,
+                                   size_t maxN);
 
  private:
   IHttpClient& http_;

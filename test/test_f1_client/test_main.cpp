@@ -64,11 +64,40 @@ void test_parsear_ultima_sin_races(void) {
   TEST_ASSERT_FALSE(F1Client::parsearUltima(payload, c, p));
 }
 
+// Payload standings — clasificación mundial de pilotos
+static const char* PAYLOAD_STANDINGS = R"({
+"MRData":{"StandingsTable":{"StandingsLists":[{
+  "season":"2026","round":"15",
+  "DriverStandings":[
+    {"position":"1","points":"242","Driver":{"familyName":"Antonelli"},"Constructors":[{"name":"Mercedes"}]},
+    {"position":"2","points":"183","Driver":{"familyName":"Russell"},"Constructors":[{"name":"Mercedes"}]},
+    {"position":"3","points":"183","Driver":{"familyName":"Hamilton"},"Constructors":[{"name":"Ferrari"}]},
+    {"position":"4","points":"159","Driver":{"familyName":"Norris"},"Constructors":[{"name":"McLaren"}]}
+  ]}]}}
+})";
+
+void test_parsear_clasificacion_devuelve_top4(void) {
+  std::vector<F1PilotoClas> v;
+  TEST_ASSERT_TRUE(F1Client::parsearClasificacion(PAYLOAD_STANDINGS, v, 4));
+  TEST_ASSERT_EQUAL(4, (int)v.size());
+  TEST_ASSERT_EQUAL_STRING("Antonelli", v[0].nombre.c_str());
+  TEST_ASSERT_EQUAL_STRING("Mercedes", v[0].equipo.c_str());
+  TEST_ASSERT_EQUAL(242, v[0].puntos);
+  TEST_ASSERT_EQUAL(4, v[3].posicion);
+}
+
+void test_parsear_clasificacion_json_malformado(void) {
+  std::vector<F1PilotoClas> v;
+  TEST_ASSERT_FALSE(F1Client::parsearClasificacion("{", v, 4));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_parsear_ultima_devuelve_top3);
   RUN_TEST(test_parsear_calendario_filtra_pasadas);
   RUN_TEST(test_parsear_json_malformado);
   RUN_TEST(test_parsear_ultima_sin_races);
+  RUN_TEST(test_parsear_clasificacion_devuelve_top4);
+  RUN_TEST(test_parsear_clasificacion_json_malformado);
   return UNITY_END();
 }
