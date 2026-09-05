@@ -12,4 +12,6 @@ constexpr uint16_t COL_ACENTO      = 0x7CBF;   // ~ #79b8ff
 constexpr uint16_t COL_OK          = 0x5EAC;   // ~ #56d364
 constexpr uint16_t COL_WARN        = 0xF3C1;   // ~ #f0883e
 constexpr uint16_t COL_ERROR       = 0xFA25;   // ~ #f85149
+constexpr uint16_t COL_LIVE        = 0xF800;   // rojo puro para badge EN VIVO
+constexpr uint16_t COL_CAJA        = 0x30E5;   // gris azulado ~ #333844
 }  // namespace paleta_dark

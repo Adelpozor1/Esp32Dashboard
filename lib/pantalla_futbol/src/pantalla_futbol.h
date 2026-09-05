@@ -17,15 +17,18 @@ class PantallaFutbol : public pantallas::Pantalla {
   void dibujar(uint32_t msAhora) override;
 
  private:
-  enum class SubVista : uint8_t { ULTIMOS = 0, PROXIMOS = 1 };
+  enum class SubVista : uint8_t { RESULTADO = 0, AGENDA = 1 };
   void dibujarSinDatos(TFT_eSPI& tft);
-  void dibujarUltimos(TFT_eSPI& tft);
-  void dibujarProximos(TFT_eSPI& tft);
+  void dibujarResultado(TFT_eSPI& tft, uint32_t msAhora);
+  void dibujarAgenda(TFT_eSPI& tft);
   void dibujarIndicador(TFT_eSPI& tft);
+  void dibujarBadgeLive(TFT_eSPI& tft, int x, int y, bool encendido);
   static std::string truncar(const std::string& s, size_t n);
 
   const FutbolSnapshot& snap_;
-  SubVista sub_ = SubVista::ULTIMOS;
+  SubVista sub_ = SubVista::RESULTADO;
   bool     dirty_ = true;
   uint32_t ultObtenidoMs_ = 0;
+  uint32_t ultParpadeoMs_ = 0;
+  bool     badgeEncendido_ = true;
 };

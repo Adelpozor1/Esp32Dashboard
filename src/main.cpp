@@ -188,9 +188,10 @@ void tareaDeportesRefresh(void*) {
         nf.obtenido_ms = millis();
         nf.stale = false;
         g_snapFutbol = nf;
-        Serial.printf("[futbol] refresh OK ultimos=%d proximos=%d\n",
-                      (int)g_snapFutbol.ultimos.size(),
-                      (int)g_snapFutbol.proximos.size());
+        Serial.printf("[futbol] refresh OK live=%d ultimo=%d hoyManana=%d\n",
+                      g_snapFutbol.hayLive ? 1 : 0,
+                      g_snapFutbol.hayUltimo ? 1 : 0,
+                      (int)g_snapFutbol.hoyManana.size());
       } else {
         g_snapFutbol.stale = true;
         Serial.println("[futbol] refresh FALLO");
