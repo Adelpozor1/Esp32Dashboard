@@ -73,14 +73,43 @@ void PantallaMotogp::dibujarUltimos(TFT_eSPI& tft) {
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
   tft.print("Ultimas carreras");
-  int y = OFFSET_Y + 34;
   const int n = std::min<int>(4, static_cast<int>(snap_.ultimos.size()));
   if (n == 0) {
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
+    tft.setCursor(10, OFFSET_Y + 100);
     tft.print("(sin datos)");
     return;
   }
+  if (n == 1) {
+    const auto& e = snap_.ultimos[0];
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string nombre = truncar(e.nombre, 20);
+    int16_t w = tft.textWidth(nombre.c_str());
+    tft.setCursor((W - w) / 2, OFFSET_Y + 60);
+    tft.print(nombre.c_str());
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wF = tft.textWidth(e.fechaHora.c_str());
+    tft.setCursor((W - wF) / 2, OFFSET_Y + 105);
+    tft.print(e.fechaHora.c_str());
+    if (!e.ganador.empty()) {
+      tft.setTextFont(2);
+      tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+      const char* lbl = "Ganador:";
+      int16_t wL = tft.textWidth(lbl);
+      tft.setCursor((W - wL) / 2, OFFSET_Y + 145);
+      tft.print(lbl);
+      tft.setTextFont(4);
+      tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+      std::string g = truncar(e.ganador, 18);
+      int16_t wG = tft.textWidth(g.c_str());
+      tft.setCursor((W - wG) / 2, OFFSET_Y + 170);
+      tft.print(g.c_str());
+    }
+    return;
+  }
+  int y = OFFSET_Y + 34;
   for (int i = 0; i < n; ++i) {
     const auto& e = snap_.ultimos[i];
     tft.setTextFont(2);
@@ -102,14 +131,29 @@ void PantallaMotogp::dibujarCalendario(TFT_eSPI& tft) {
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
   tft.print("Calendario");
-  int y = OFFSET_Y + 34;
   const int n = std::min<int>(5, static_cast<int>(snap_.proximos.size()));
   if (n == 0) {
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
+    tft.setCursor(10, OFFSET_Y + 100);
     tft.print("(sin datos)");
     return;
   }
+  if (n == 1) {
+    const auto& e = snap_.proximos[0];
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string nombre = truncar(e.nombre, 20);
+    int16_t w = tft.textWidth(nombre.c_str());
+    tft.setCursor((W - w) / 2, OFFSET_Y + 80);
+    tft.print(nombre.c_str());
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wF = tft.textWidth(e.fechaHora.c_str());
+    tft.setCursor((W - wF) / 2, OFFSET_Y + 130);
+    tft.print(e.fechaHora.c_str());
+    return;
+  }
+  int y = OFFSET_Y + 34;
   for (int i = 0; i < n; ++i) {
     const auto& e = snap_.proximos[i];
     tft.setTextFont(2);

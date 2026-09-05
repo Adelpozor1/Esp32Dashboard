@@ -1,6 +1,8 @@
 #include "futbol_client.h"
 #include <ArduinoJson.h>
 #include <cstring>
+#include <ctime>
+#include <cstdio>
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -22,14 +24,30 @@ int parseGoles(JsonVariantConst v) {
 }
 
 std::string componerFechaHora(const std::string& fecha, const std::string& hora) {
-  // fecha "YYYY-MM-DD" (>=10 chars), hora "HH:MM:SS" (>=5 chars). Devolvemos "YYYY-MM-DD HH:MM".
-  std::string out;
-  if (fecha.size() >= 10) out.append(fecha.substr(0, 10));
+  static const char* DIAS[7]  = {"Dom","Lun","Mar","Mie","Jue","Vie","Sab"};
+  static const char* MESES[12] = {"ene","feb","mar","abr","may","jun",
+                                   "jul","ago","sep","oct","nov","dic"};
+  if (fecha.size() < 10) return "";
+  int anio = std::atoi(fecha.substr(0, 4).c_str());
+  int mes  = std::atoi(fecha.substr(5, 2).c_str());
+  int dia  = std::atoi(fecha.substr(8, 2).c_str());
+  if (anio < 2000 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return "";
+  struct tm tm = {};
+  tm.tm_year = anio - 1900;
+  tm.tm_mon  = mes - 1;
+  tm.tm_mday = dia;
+  tm.tm_hour = 12;   // mediodía para evitar líos DST
+  mktime(&tm);
+  char buf[32];
+  const int wday = (tm.tm_wday >= 0 && tm.tm_wday < 7) ? tm.tm_wday : 0;
+  const int mIdx = (tm.tm_mon >= 0 && tm.tm_mon < 12) ? tm.tm_mon : 0;
   if (hora.size() >= 5) {
-    if (!out.empty()) out.push_back(' ');
-    out.append(hora.substr(0, 5));
+    std::snprintf(buf, sizeof(buf), "%s %d %s %s",
+                  DIAS[wday], dia, MESES[mIdx], hora.substr(0, 5).c_str());
+  } else {
+    std::snprintf(buf, sizeof(buf), "%s %d %s", DIAS[wday], dia, MESES[mIdx]);
   }
-  return out;
+  return std::string(buf);
 }
 }  // namespace
 

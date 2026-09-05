@@ -77,28 +77,61 @@ void PantallaFutbol::dibujarIndicador(TFT_eSPI& tft) {
 void PantallaFutbol::dibujarUltimos(TFT_eSPI& tft) {
   pintarFondo(tft);
   dibujarIndicador(tft);
-  // Título
   tft.setTextFont(2);
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
   tft.print("Ultima jornada");
-  // Filas
-  int y = OFFSET_Y + 34;
-  tft.setTextFont(2);
   const int n = std::min<int>(5, static_cast<int>(snap_.ultimos.size()));
   if (n == 0) {
+    tft.setTextFont(2);
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
+    tft.setCursor(10, OFFSET_Y + 100);
     tft.print("(sin partidos)");
     return;
   }
+  if (n == 1) {
+    const auto& p = snap_.ultimos[0];
+    // Local en font 4 arriba, resultado gigante en font 7 centro, visitante en font 4 abajo.
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string loc = truncar(p.local, 18);
+    int16_t wL = tft.textWidth(loc.c_str());
+    tft.setCursor((W - wL) / 2, OFFSET_Y + 50);
+    tft.print(loc.c_str());
+    // Resultado
+    char buf[16];
+    if (p.golesLocal >= 0 && p.golesVisitante >= 0)
+      std::snprintf(buf, sizeof(buf), "%d - %d", p.golesLocal, p.golesVisitante);
+    else
+      std::snprintf(buf, sizeof(buf), "vs");
+    tft.setTextFont(7);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wR = tft.textWidth(buf);
+    tft.setCursor((W - wR) / 2, OFFSET_Y + 90);
+    tft.print(buf);
+    // Visitante
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string vis = truncar(p.visitante, 18);
+    int16_t wV = tft.textWidth(vis.c_str());
+    tft.setCursor((W - wV) / 2, OFFSET_Y + 160);
+    tft.print(vis.c_str());
+    // Fecha
+    tft.setTextFont(1);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    int16_t wF = tft.textWidth(p.fechaHora.c_str());
+    tft.setCursor((W - wF) / 2, OFFSET_Y + 200);
+    tft.print(p.fechaHora.c_str());
+    return;
+  }
+  // n > 1: tabla como antes
+  int y = OFFSET_Y + 34;
+  tft.setTextFont(2);
   for (int i = 0; i < n; ++i) {
     const auto& p = snap_.ultimos[i];
-    // Local
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
     tft.setCursor(10, y);
     tft.print(truncar(p.local, 12).c_str());
-    // Resultado
     char buf[12];
     if (p.golesLocal >= 0 && p.golesVisitante >= 0) {
       std::snprintf(buf, sizeof(buf), "%d - %d", p.golesLocal, p.golesVisitante);
@@ -109,7 +142,6 @@ void PantallaFutbol::dibujarUltimos(TFT_eSPI& tft) {
     int16_t wRes = tft.textWidth(buf);
     tft.setCursor((W - wRes) / 2, y);
     tft.print(buf);
-    // Visitante alineado a la derecha
     std::string vis = truncar(p.visitante, 12);
     int16_t wVis = tft.textWidth(vis.c_str());
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
@@ -126,33 +158,56 @@ void PantallaFutbol::dibujarProximos(TFT_eSPI& tft) {
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
   tft.print("Proxima jornada");
-  int y = OFFSET_Y + 34;
-  const int n = std::min<int>(4, static_cast<int>(snap_.proximos.size()));   // 4 partidos porque cada uno son 2 filas
+  const int n = std::min<int>(4, static_cast<int>(snap_.proximos.size()));
   if (n == 0) {
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y);
+    tft.setCursor(10, OFFSET_Y + 100);
     tft.print("(sin partidos)");
     return;
   }
+  if (n == 1) {
+    const auto& p = snap_.proximos[0];
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string loc = truncar(p.local, 18);
+    int16_t wL = tft.textWidth(loc.c_str());
+    tft.setCursor((W - wL) / 2, OFFSET_Y + 60);
+    tft.print(loc.c_str());
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    const char* vs = "vs";
+    int16_t wVs = tft.textWidth(vs);
+    tft.setCursor((W - wVs) / 2, OFFSET_Y + 105);
+    tft.print(vs);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    std::string vis = truncar(p.visitante, 18);
+    int16_t wV = tft.textWidth(vis.c_str());
+    tft.setCursor((W - wV) / 2, OFFSET_Y + 150);
+    tft.print(vis.c_str());
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wF = tft.textWidth(p.fechaHora.c_str());
+    tft.setCursor((W - wF) / 2, OFFSET_Y + 195);
+    tft.print(p.fechaHora.c_str());
+    return;
+  }
+  // n > 1: como antes
+  int y = OFFSET_Y + 34;
   for (int i = 0; i < n; ++i) {
     const auto& p = snap_.proximos[i];
-    // Fila 1: LOCAL vs VISITANTE
     tft.setTextFont(2);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
     tft.setCursor(10, y);
     tft.print(truncar(p.local, 12).c_str());
-    // "vs" centrado
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
     int16_t wVs = tft.textWidth("vs");
     tft.setCursor((W - wVs) / 2, y);
     tft.print("vs");
-    // Visitante
     std::string vis = truncar(p.visitante, 12);
     int16_t wVis = tft.textWidth(vis.c_str());
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
     tft.setCursor(W - 10 - wVis, y);
     tft.print(vis.c_str());
-    // Fila 2: fecha/hora en gris centrada
     tft.setTextFont(1);
     tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
     int16_t wFH = tft.textWidth(p.fechaHora.c_str());

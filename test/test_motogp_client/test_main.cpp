@@ -8,6 +8,8 @@ static const char* PAYLOAD_PAST = R"({"events":[
 ]})";
 
 static const char* PAYLOAD_NEXT = R"({"events":[
+  {"strEvent":"San Marino Free Practice 1","dateEvent":"2026-09-11","strTime":"09:00:00"},
+  {"strEvent":"San Marino Qualifying","dateEvent":"2026-09-12","strTime":"14:00:00"},
   {"strEvent":"San Marino GP","dateEvent":"2026-09-13","strTime":"14:00:00"},
   {"strEvent":"Aragon GP","dateEvent":"2026-09-20","strTime":"14:00:00"}
 ]})";
@@ -18,12 +20,14 @@ void test_parsear_eventos_past(void) {
   TEST_ASSERT_EQUAL(2, (int)v.size());
   TEST_ASSERT_EQUAL_STRING("Spanish Grand Prix", v[0].nombre.c_str());
   TEST_ASSERT_EQUAL_STRING("Rider A", v[0].ganador.c_str());
-  TEST_ASSERT_EQUAL_STRING("2026-08-30 14:00", v[0].fechaHora.c_str());
+  TEST_ASSERT_TRUE(v[0].fechaHora.find("30 ago") != std::string::npos);
+  TEST_ASSERT_TRUE(v[0].fechaHora.find("14:00") != std::string::npos);
 }
 
 void test_parsear_eventos_proximos(void) {
   std::vector<EventoMotor> v;
   TEST_ASSERT_TRUE(MotogpClient::parsearEventos(PAYLOAD_NEXT, v, 5));
+  // Sólo GPs — se filtran FP y Qualifying.
   TEST_ASSERT_EQUAL(2, (int)v.size());
   TEST_ASSERT_EQUAL_STRING("San Marino GP", v[0].nombre.c_str());
   TEST_ASSERT_EQUAL_STRING("", v[0].ganador.c_str());

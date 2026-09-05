@@ -22,7 +22,8 @@ void test_parsear_eventos_pasados(void) {
   TEST_ASSERT_EQUAL_STRING("Barcelona", v[0].visitante.c_str());
   TEST_ASSERT_EQUAL(2, v[0].golesLocal);
   TEST_ASSERT_EQUAL(1, v[0].golesVisitante);
-  TEST_ASSERT_EQUAL_STRING("2026-09-01 20:00", v[0].fechaHora.c_str());
+  TEST_ASSERT_TRUE(v[0].fechaHora.find("1 sep") != std::string::npos);
+  TEST_ASSERT_TRUE(v[0].fechaHora.find("20:00") != std::string::npos);
 }
 
 void test_parsear_eventos_proximos_sin_resultado(void) {
