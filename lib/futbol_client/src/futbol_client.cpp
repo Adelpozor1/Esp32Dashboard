@@ -146,7 +146,10 @@ void FutbolClient::filtrarHoyManana(const std::string& json,
 }
 
 bool FutbolClient::fetch(FutbolSnapshot& out) {
-  const char* URL_LIVE = "https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Soccer";
+  // NOTA: NO usamos livescore.php porque devuelve ~90 KB (todos los partidos de
+  // fútbol del mundo en curso) y getString() en ESP32 revienta el heap con
+  // "HTTPClient short write got 0 failed" + abort(). Cuando haya modo streaming
+  // JSON se reintroducirá el badge EN VIVO.
   const char* URL_PAST = "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4335";
   const char* URL_NEXT = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4335";
 
@@ -157,39 +160,21 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
   std::string body;
   int status = 0;
 
-  // 1) Livescore. No es error crítico si falla, sólo que no habrá "live".
-  if (http_.get(URL_LIVE, body, status, 20000) && status == 200 && !body.empty()) {
-    PartidoLive pl;
-    if (parsearLive(body, pl)) {
-      out.live    = pl;
-      out.hayLive = true;
+  // 1) Último jugado.
+  if (http_.get(URL_PAST, body, status, 20000) && status == 200 && !body.empty()) {
+    Partido u;
+    if (parsearUltimo(body, u)) {
+      out.ultimoJugado = u;
+      out.hayUltimo    = true;
     }
   } else {
 #ifdef ARDUINO
-    ::Serial.printf("[futbol] live fallo status=%d body=%u\n",
+    ::Serial.printf("[futbol] past fallo status=%d body=%u\n",
                     status, (unsigned)body.size());
 #endif
   }
 
-  // 2) Último jugado — sólo si no hay live.
-  if (!out.hayLive) {
-    body.clear();
-    status = 0;
-    if (http_.get(URL_PAST, body, status, 20000) && status == 200 && !body.empty()) {
-      Partido u;
-      if (parsearUltimo(body, u)) {
-        out.ultimoJugado = u;
-        out.hayUltimo    = true;
-      }
-    } else {
-#ifdef ARDUINO
-      ::Serial.printf("[futbol] past fallo status=%d body=%u\n",
-                      status, (unsigned)body.size());
-#endif
-    }
-  }
-
-  // 3) Hoy y mañana.
+  // 2) Hoy y mañana.
   body.clear();
   status = 0;
   if (http_.get(URL_NEXT, body, status, 20000) && status == 200 && !body.empty()) {
@@ -203,6 +188,6 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
 #endif
   }
 
-  out.ok = out.hayLive || out.hayUltimo || !out.hoyManana.empty();
+  out.ok = out.hayUltimo || !out.hoyManana.empty();
   return out.ok;
 }
