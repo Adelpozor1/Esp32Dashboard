@@ -63,7 +63,7 @@ void PantallaF1::dibujarSinDatos(TFT_eSPI& tft) {
   pintarFondo(tft);
   tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
   tft.setTextFont(4);
-  const char* t = "F1: sin datos";
+  const char* t = (snap_.obtenido_ms == 0) ? "Cargando datos..." : "F1: sin datos";
   int16_t w = tft.textWidth(t);
   tft.setCursor((W - w) / 2, OFFSET_Y + 90);
   tft.print(t);

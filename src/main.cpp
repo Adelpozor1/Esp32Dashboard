@@ -179,8 +179,9 @@ void tareaDeportesRefresh(void*) {
   FutbolClient cliFut(g_http);
   MotogpClient cliMot(g_http);
   F1Client     cliF1(g_http);
-  vTaskDelay(pdMS_TO_TICKS(15000));   // gracia inicial (deja que meteo acabe)
+  vTaskDelay(pdMS_TO_TICKS(3000));   // gracia mínima: WiFi ya conectado en setup
   for (;;) {
+    bool todoOk = true;
     if (WiFi.status() == WL_CONNECTED) {
       // --- Fútbol ---
       FutbolSnapshot nf;
@@ -194,6 +195,7 @@ void tareaDeportesRefresh(void*) {
                       (int)g_snapFutbol.hoyManana.size());
       } else {
         g_snapFutbol.stale = true;
+        todoOk = false;
         Serial.println("[futbol] refresh FALLO");
       }
       vTaskDelay(pdMS_TO_TICKS(5000));
@@ -209,6 +211,7 @@ void tareaDeportesRefresh(void*) {
                       (int)g_snapMotogp.proximos.size());
       } else {
         g_snapMotogp.stale = true;
+        todoOk = false;
         Serial.println("[motogp] refresh FALLO");
       }
       vTaskDelay(pdMS_TO_TICKS(5000));
@@ -224,10 +227,17 @@ void tareaDeportesRefresh(void*) {
                       (int)g_snapF1.proximas.size());
       } else {
         g_snapF1.stale = true;
+        todoOk = false;
         Serial.println("[f1] refresh FALLO");
       }
+    } else {
+      todoOk = false;
     }
-    vTaskDelay(pdMS_TO_TICKS(3UL * 3600UL * 1000UL));   // 3 h (frecuencia dominante = fútbol)
+    // Backoff dinámico: si todo OK esperamos 3h; si algo falló reintentamos en 5 min
+    // para que el usuario no vea "sin datos" durante horas por un fallo puntual.
+    const uint32_t espera_ms = todoOk ? (3UL * 3600UL * 1000UL)
+                                       : (5UL * 60UL * 1000UL);
+    vTaskDelay(pdMS_TO_TICKS(espera_ms));
   }
 }
 
