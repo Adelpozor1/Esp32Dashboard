@@ -92,7 +92,7 @@ void PantallaAjustes::dibujar(uint32_t) {
     fila(buf);
     fila(" ");  // ocupa el hueco de la fila 2 en modo fijo
   }
-  fila("Reconfigurar localizacion");
+  fila("Cambiar WiFi / ubicacion");
   fila("Calibrar tactil");
   fila("Reset total");
   fila("< Volver");

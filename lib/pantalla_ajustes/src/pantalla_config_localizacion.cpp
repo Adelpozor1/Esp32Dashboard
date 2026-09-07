@@ -36,16 +36,18 @@ void PantallaConfigLocalizacion::dibujar(uint32_t) {
 
   std::string url = std::string("http://") + WiFi.localIP().toString().c_str() + "/config";
   std::vector<std::string> lineas = {
-    "1. Escanea con",
-    "   el movil",
+    "Escanea con",
+    "el movil (en",
+    "la misma WiFi)",
     "",
-    "(en la WiFi",
-    "de casa)",
+    "Podras cambiar",
+    "WiFi, direccion",
+    "y radio.",
     "",
     "URL:",
     url,
   };
-  qr_view::pintarPortalConQR(tft, "Reconfigurar", url, lineas);
+  qr_view::pintarPortalConQR(tft, "Cambiar WiFi/lugar", url, lineas);
   tft.setTextFont(2);
   tft.setTextColor(0x07E0, 0x0000);
   tft.setCursor(10, 222);
