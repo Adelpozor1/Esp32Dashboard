@@ -10,12 +10,6 @@ constexpr int OFFSET_Y    = 20;
 constexpr int W           = 320;
 constexpr int H_CONTENIDO = 220;
 
-// Botón toggle Champions / LaLiga en la cabecera, arriba-derecha.
-constexpr int BTN_W  = 88;
-constexpr int BTN_H  = 22;
-constexpr int BTN_X  = W - BTN_W - 6;
-constexpr int BTN_Y  = OFFSET_Y + 4;
-
 void pintarFondo(TFT_eSPI& tft) {
   tft.fillRect(0, OFFSET_Y, W, H_CONTENIDO, paleta_dark::COL_FONDO);
 }
@@ -35,31 +29,20 @@ void PantallaFutbol::alEntrar() {
   ultObtenidoMs_ = 0;
 }
 
-void PantallaFutbol::alDeslizar(pantallas::Direccion dir) {
-  if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
-    sub_ = (sub_ == SubVista::JORNADA_ACTUAL) ? SubVista::PROXIMA_JORNADA
-                                              : SubVista::JORNADA_ACTUAL;
-    dirty_ = true;
-  }
-}
-
-bool PantallaFutbol::tapEnBotonToggle(int x, int y) const {
-  // y viene relativo al área de contenido (0..220). Sumamos OFFSET_Y.
-  const int yAbs = y + OFFSET_Y;
-  return snap_.hayChampionsDisponible &&
-         x >= BTN_X && x <= BTN_X + BTN_W &&
-         yAbs >= BTN_Y && yAbs <= BTN_Y + BTN_H;
-}
-
-void PantallaFutbol::alTocar(int x, int y) {
-  if (tapEnBotonToggle(x, y) && onToggle_) {
-    onToggle_();
-    return;
-  }
-  // Tap fuera del botón alterna la sub-vista (jornada actual ↔ próxima).
+void PantallaFutbol::alternarSubVista() {
   sub_ = (sub_ == SubVista::JORNADA_ACTUAL) ? SubVista::PROXIMA_JORNADA
                                              : SubVista::JORNADA_ACTUAL;
   dirty_ = true;
+}
+
+void PantallaFutbol::alDeslizar(pantallas::Direccion dir) {
+  if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
+    alternarSubVista();
+  }
+}
+
+void PantallaFutbol::alTocar(int /*x*/, int /*y*/) {
+  alternarSubVista();
 }
 
 void PantallaFutbol::dibujar(uint32_t /*msAhora*/) {
@@ -92,25 +75,10 @@ void PantallaFutbol::dibujarSinDatos(TFT_eSPI& tft) {
 }
 
 void PantallaFutbol::dibujarCabecera(TFT_eSPI& tft) {
-  // Título competición actual (izquierda)
   tft.setTextFont(2);
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(8, OFFSET_Y + 7);
-  const char* nombre = (snap_.competicion == Competicion::CHAMPIONS)
-      ? "Champions" : "LaLiga";
-  tft.print(nombre);
-
-  // Botón toggle (derecha) sólo si hay Champions activa o ya estamos en Champions
-  if (snap_.hayChampionsDisponible || snap_.competicion == Competicion::CHAMPIONS) {
-    tft.drawRect(BTN_X, BTN_Y, BTN_W, BTN_H, paleta_dark::COL_ACENTO);
-    tft.setTextFont(2);
-    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
-    const char* etq = (snap_.competicion == Competicion::CHAMPIONS)
-        ? "> LaLiga" : "> Champions";
-    int16_t tw = tft.textWidth(etq);
-    tft.setCursor(BTN_X + (BTN_W - tw) / 2, BTN_Y + 4);
-    tft.print(etq);
-  }
+  tft.print("LaLiga");
 }
 
 void PantallaFutbol::dibujarIndicador(TFT_eSPI& tft) {

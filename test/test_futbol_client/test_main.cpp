@@ -63,12 +63,6 @@ static const char* PAYLOAD_RONDA_4 = R"({"events":[
   {"strHomeTeam":"Valencia","strAwayTeam":"Barcelona","intHomeScore":"0","intAwayScore":"5","dateEvent":"2026-09-06","strTime":"14:15:00","intRound":"4","strSeason":"2026-2027"}
 ]})";
 
-static const char* PAYLOAD_CHAMPIONS_ACTIVA = R"({"events":[
-  {"strHomeTeam":"Club Brugge","strAwayTeam":"Aston Villa","dateEvent":"2026-09-08","strTime":"18:45:00","intRound":"1","strSeason":"2026-2027"}
-]})";
-
-static const char* PAYLOAD_CHAMPIONS_VACIA = R"({"events":null})";
-
 void test_parsear_jornada_devuelve_partidos_con_marcador(void) {
   std::vector<Partido> v;
   TEST_ASSERT_TRUE(FutbolClient::parsearJornada(PAYLOAD_RONDA_4, v));
@@ -86,11 +80,6 @@ void test_parsear_ultima_ronda_y_season_futbol(void) {
   TEST_ASSERT_EQUAL_STRING("2026-2027", s.c_str());
 }
 
-void test_detectar_champions_activa(void) {
-  TEST_ASSERT_TRUE(FutbolClient::detectarChampionsActiva(PAYLOAD_CHAMPIONS_ACTIVA));
-  TEST_ASSERT_FALSE(FutbolClient::detectarChampionsActiva(PAYLOAD_CHAMPIONS_VACIA));
-}
-
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_parsear_live_encuentra_partido_de_la_liga);
@@ -99,6 +88,5 @@ int main(int, char**) {
   RUN_TEST(test_filtrar_hoy_manana_devuelve_solo_esos);
   RUN_TEST(test_parsear_jornada_devuelve_partidos_con_marcador);
   RUN_TEST(test_parsear_ultima_ronda_y_season_futbol);
-  RUN_TEST(test_detectar_champions_activa);
   return UNITY_END();
 }

@@ -20,15 +20,9 @@ inline void pausaHeap() {
 
 namespace {
 constexpr const char* LIGA_ID = "4335";   // LaLiga en TheSportsDB (legacy live parser)
-constexpr const char* CHAMPIONS_ID = "4480";
-
-const char* idDe(Competicion c) {
-  return (c == Competicion::CHAMPIONS) ? "4480" : "4335";
-}
 
 // Season por defecto si el past no la devuelve (para primer arranque).
-const char* seasonPorDefecto(Competicion c) {
-  (void)c;
+const char* seasonPorDefecto() {
   return "2026-2027";
 }
 
@@ -194,33 +188,20 @@ bool FutbolClient::parsearUltimaRondaYSeason(const std::string& json,
   return outRonda > 0 && !outSeason.empty();
 }
 
-bool FutbolClient::detectarChampionsActiva(const std::string& jsonNext) {
-  JsonDocument doc;
-  if (deserializeJson(doc, jsonNext)) return false;
-  auto ev = doc["events"].as<JsonArrayConst>();
-  return !ev.isNull() && ev.size() > 0;
-}
-
 bool FutbolClient::fetch(FutbolSnapshot& out) {
-  out.competicion = competicion_;
   out.partidosJornada.clear();
   out.partidosSiguiente.clear();
   out.jornadaActual = 0;
   out.jornadaSiguiente = 0;
-  // hayChampionsDisponible se calcula abajo; NO se resetea si estamos en
-  // Champions (obvio: si estamos viéndolo, está disponible).
-  out.hayChampionsDisponible = (competicion_ == Competicion::CHAMPIONS);
 
-  const char* id = idDe(competicion_);
   std::string body; int status = 0;
 
   // 1) Past para averiguar última ronda + season.
-  char urlPast[160];
-  std::snprintf(urlPast, sizeof(urlPast),
-    "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=%s", id);
+  const char* URL_PAST =
+    "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4335";
   int ultimaRonda = 0;
-  std::string season = seasonPorDefecto(competicion_);
-  if (http_.get(urlPast, body, status, 20000) && status == 200 && !body.empty()) {
+  std::string season = seasonPorDefecto();
+  if (http_.get(URL_PAST, body, status, 20000) && status == 200 && !body.empty()) {
     parsearUltimaRondaYSeason(body, ultimaRonda, season);
 #ifdef ARDUINO
     ::Serial.printf("[futbol] past OK ronda=%d season=%s\n", ultimaRonda, season.c_str());
@@ -236,8 +217,8 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
   if (ultimaRonda > 0 && !season.empty()) {
     char urlR[200];
     std::snprintf(urlR, sizeof(urlR),
-      "https://www.thesportsdb.com/api/v1/json/3/eventsround.php?id=%s&r=%d&s=%s",
-      id, ultimaRonda, season.c_str());
+      "https://www.thesportsdb.com/api/v1/json/3/eventsround.php?id=4335&r=%d&s=%s",
+      ultimaRonda, season.c_str());
     body.clear(); status = 0;
     if (http_.get(urlR, body, status, 20000) && status == 200 && !body.empty()) {
       std::vector<Partido> pj;
@@ -254,8 +235,8 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
 
     // 3) Próxima jornada = ronda + 1.
     std::snprintf(urlR, sizeof(urlR),
-      "https://www.thesportsdb.com/api/v1/json/3/eventsround.php?id=%s&r=%d&s=%s",
-      id, ultimaRonda + 1, season.c_str());
+      "https://www.thesportsdb.com/api/v1/json/3/eventsround.php?id=4335&r=%d&s=%s",
+      ultimaRonda + 1, season.c_str());
     body.clear(); status = 0;
     if (http_.get(urlR, body, status, 20000) && status == 200 && !body.empty()) {
       std::vector<Partido> ps;
@@ -267,16 +248,6 @@ bool FutbolClient::fetch(FutbolSnapshot& out) {
 #ifdef ARDUINO
       ::Serial.printf("[futbol] ronda+1 %d fallo status=%d\n", ultimaRonda + 1, status);
 #endif
-    }
-    pausaHeap();
-  }
-
-  // 4) ¿Champions activa? Sólo consultamos si NO estamos ya en Champions.
-  if (competicion_ == Competicion::LALIGA) {
-    body.clear(); status = 0;
-    if (http_.get("https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4480",
-                  body, status, 20000) && status == 200 && !body.empty()) {
-      out.hayChampionsDisponible = detectarChampionsActiva(body);
     }
   }
 

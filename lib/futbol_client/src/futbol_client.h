@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-enum class Competicion { LALIGA, CHAMPIONS };
-
 struct Partido {
   std::string local;
   std::string visitante;
@@ -28,23 +26,16 @@ struct FutbolSnapshot {
   uint32_t obtenido_ms = 0;
   bool     stale = false;
 
-  Competicion competicion = Competicion::LALIGA;
-
   int      jornadaActual = 0;
   std::vector<Partido> partidosJornada;      // marcador rellenado si jugado
 
   int      jornadaSiguiente = 0;
   std::vector<Partido> partidosSiguiente;    // fechaHora rellenada, marcador -1
-
-  bool     hayChampionsDisponible = false;
 };
 
 class FutbolClient {
  public:
   explicit FutbolClient(IHttpClient& http) : http_(http) {}
-
-  void setCompeticion(Competicion c) { competicion_ = c; }
-  Competicion getCompeticion() const { return competicion_; }
 
   bool fetch(FutbolSnapshot& out);
 
@@ -57,10 +48,6 @@ class FutbolClient {
                                         int& outRonda,
                                         std::string& outSeason);
 
-  // Devuelve true si el JSON de eventsnextleague.php?id=4480 tiene al menos
-  // un evento; se usa para decidir si el botón "Champions" es visible.
-  static bool detectarChampionsActiva(const std::string& jsonNext);
-
   // Legacy: mantenidos para no romper tests antiguos.
   static bool parsearLive(const std::string& json, PartidoLive& out);
   static bool parsearUltimo(const std::string& json, Partido& out);
@@ -71,5 +58,4 @@ class FutbolClient {
 
  private:
   IHttpClient& http_;
-  Competicion competicion_ = Competicion::LALIGA;
 };

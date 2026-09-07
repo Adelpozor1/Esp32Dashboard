@@ -52,9 +52,8 @@ FutbolSnapshot  g_snapFutbol;
 MotogpSnapshot  g_snapMotogp;
 F1Snapshot      g_snapF1;
 
-// Cliente compartido con la pantalla para poder alternar competición.
-FutbolClient*   g_cliFutbol = nullptr;
-// Handle de la task de deportes para forzar refresh (notificación FreeRTOS).
+// Handle de la task de deportes para forzar refresh vía xTaskNotifyGive
+// (útil por si un futuro control quiere pedir un ciclo inmediato).
 TaskHandle_t    g_handleDeportes = nullptr;
 
 // Renderer real: barra superior con "menú" a la izquierda, título centrado, dots
@@ -183,8 +182,7 @@ void tareaMeteoRefresh(void*) {
 // el WDT. Se agrupan en una sola task secuencial con pausas para que el heap
 // se libere entre peticiones.
 void tareaDeportesRefresh(void*) {
-  static FutbolClient cliFut(g_http);
-  g_cliFutbol = &cliFut;
+  FutbolClient cliFut(g_http);
   MotogpClient cliMot(g_http);
   F1Client     cliF1(g_http);
   // Gracia inicial 8s: deja que meteo (que arranca a los 5s) termine su TLS
@@ -200,12 +198,11 @@ void tareaDeportesRefresh(void*) {
         nf.obtenido_ms = millis();
         nf.stale = false;
         g_snapFutbol = nf;
-        Serial.printf("[futbol] refresh OK j%d(%d)/j%d(%d) champions=%d\n",
+        Serial.printf("[futbol] refresh OK j%d(%d)/j%d(%d)\n",
                       g_snapFutbol.jornadaActual,
                       (int)g_snapFutbol.partidosJornada.size(),
                       g_snapFutbol.jornadaSiguiente,
-                      (int)g_snapFutbol.partidosSiguiente.size(),
-                      g_snapFutbol.hayChampionsDisponible ? 1 : 0);
+                      (int)g_snapFutbol.partidosSiguiente.size());
       } else {
         g_snapFutbol.stale = true;
         todoOk = false;
@@ -322,19 +319,7 @@ void modoRadar() {
   // Construir pantallas.
   auto* radar   = new PantallaRadar(*g_estado);
   auto* meteo   = new PantallaMeteo(g_snapMeteo);
-  auto* futbol  = new PantallaFutbol(g_snapFutbol, []() {
-    // Toggle Champions/LaLiga: cambia competición y despierta la task de deportes
-    // para que haga fetch inmediato en la nueva competición.
-    if (!g_cliFutbol) return;
-    Competicion actual = g_cliFutbol->getCompeticion();
-    g_cliFutbol->setCompeticion(actual == Competicion::LALIGA
-                                ? Competicion::CHAMPIONS
-                                : Competicion::LALIGA);
-    // Reset del snapshot para que la pantalla muestre "Cargando..." mientras.
-    g_snapFutbol.ok = false;
-    g_snapFutbol.obtenido_ms = 0;
-    if (g_handleDeportes) xTaskNotifyGive(g_handleDeportes);
-  });
+  auto* futbol  = new PantallaFutbol(g_snapFutbol);
   auto* motogp  = new PantallaMotogp(g_snapMotogp);
   auto* f1      = new PantallaF1(g_snapF1);
 
