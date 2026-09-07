@@ -1,0 +1,81 @@
+name: build-firmware
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Compute version
+        id: ver
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          TS=$(date -u +%Y%m%d-%H%M%S)
+          echo "sha=$SHA"     >> "$GITHUB_OUTPUT"
+          echo "ts=$TS"       >> "$GITHUB_OUTPUT"
+          echo "version=$TS-$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build firmware
+        env:
+          FIRMWARE_VERSION: ${{ steps.ver.outputs.version }}
+        run: pio run -e esp32dev
+
+      - name: Generate firmware.json
+        run: |
+          SIZE=$(stat -c%s .pio/build/esp32dev/firmware.bin)
+          cat > firmware.json <<EOF
+          {
+            "version": "${{ steps.ver.outputs.version }}",
+            "sha": "${{ steps.ver.outputs.sha }}",
+            "size": $SIZE,
+            "url": "https://github.com/${{ github.repository }}/releases/download/latest/firmware.bin"
+          }
+          EOF
+          cat firmware.json
+
+      - name: Delete previous 'latest' release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete latest --yes --cleanup-tag --repo ${{ github.repository }}
+
+      - name: Publish 'latest' release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest firmware (${{ steps.ver.outputs.version }})"
+          body: |
+            Compilación automática desde `main` — ${{ steps.ver.outputs.version }}
+            SHA: `${{ steps.ver.outputs.sha }}`
+          files: |
+            .pio/build/esp32dev/firmware.bin
+            firmware.json
+          fail_on_unmatched_files: true

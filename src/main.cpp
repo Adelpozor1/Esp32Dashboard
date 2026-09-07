@@ -30,6 +30,7 @@
 #include "pantalla_f1.h"
 #include "f1_client.h"
 #include "pantalla_ajustes.h"
+#include "ota_updater.h"
 #include "pantalla_intervalo.h"
 #include "pantalla_seleccion_vistas.h"
 #include "pantalla_seleccion_vista_fija.h"
@@ -253,6 +254,53 @@ void tareaDeportesRefresh(void*) {
   }
 }
 
+// Devuelve ms desde ahora hasta la próxima 09:00 hora local (Europe/Madrid).
+// Si NTP no está sincronizado devuelve 6 horas — el bucle vuelve a intentarlo.
+uint32_t msHastaProximaCitaOta() {
+  time_t ahora = time(nullptr);
+  if (ahora < 1600000000) return 6UL * 3600UL * 1000UL;   // NTP aún no listo
+  struct tm tmL;
+  localtime_r(&ahora, &tmL);
+  struct tm tmObj = tmL;
+  tmObj.tm_hour = 9;
+  tmObj.tm_min = 0;
+  tmObj.tm_sec = 0;
+  time_t objetivo = mktime(&tmObj);
+  if (objetivo <= ahora) objetivo += 86400;   // ya pasaron las 9 hoy → mañana
+  uint32_t seg = static_cast<uint32_t>(objetivo - ahora);
+  return seg * 1000UL;
+}
+
+void tareaOtaCheck(void*) {
+  Serial.printf("[ota] version compilada: %s\n", OtaUpdater::versionActual());
+  vTaskDelay(pdMS_TO_TICKS(60000));   // 1 min de gracia inicial
+  for (;;) {
+    uint32_t espera = msHastaProximaCitaOta();
+    Serial.printf("[ota] siguiente check en %u minutos\n", (unsigned)(espera / 60000));
+    vTaskDelay(pdMS_TO_TICKS(espera));
+
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[ota] sin WiFi, saltando");
+      continue;
+    }
+    OtaVersionInfo info;
+    if (!OtaUpdater::comprobarVersionRemota(info)) {
+      Serial.println("[ota] no se pudo leer manifest");
+      continue;
+    }
+    Serial.printf("[ota] remota=%s local=%s\n",
+                  info.version.c_str(), OtaUpdater::versionActual());
+    if (info.version == OtaUpdater::versionActual()) {
+      Serial.println("[ota] ya actualizado");
+      continue;
+    }
+    Serial.println("[ota] aplicando actualizacion...");
+    if (!OtaUpdater::aplicarActualizacion(info)) {
+      Serial.println("[ota] actualizacion FALLO, seguimos con la version actual");
+    }
+  }
+}
+
 void arrancarTouch() {
   touch::CalibracionTouch cal{g_cfg.touch_min_x, g_cfg.touch_max_x,
                               g_cfg.touch_min_y, g_cfg.touch_max_y,
@@ -346,6 +394,8 @@ void modoRadar() {
   xTaskCreatePinnedToCore(tareaMeteoRefresh, "meteo", 6144, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaDeportesRefresh, "deportes", 20480, nullptr, 1,
                           &g_handleDeportes, 0);
+  // Task de OTA a las 09:00 hora Europe/Madrid. Stack 12 KB por Update.h + TLS.
+  xTaskCreatePinnedToCore(tareaOtaCheck, "ota", 12288, nullptr, 1, nullptr, 0);
   Serial.println("[radar] modo operativo con carrusel");
 }
 
