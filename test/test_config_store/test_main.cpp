@@ -88,7 +88,8 @@ void test_deserializar_buffer_v1_rellena_defaults_v2(void) {
   TEST_ASSERT_EQUAL(static_cast<int>(ModoVista::CARRUSEL), static_cast<int>(out.modo));
   TEST_ASSERT_EQUAL(10, out.intervalo_carrusel_s);
   TEST_ASSERT_EQUAL(0, out.vista_fija);
-  TEST_ASSERT_EQUAL(6, (int)out.vistas_orden.size());
+  // Reloj (id=1) eliminado — defaults ahora {0, 2, 3, 4, 5}.
+  TEST_ASSERT_EQUAL(5, (int)out.vistas_orden.size());
   TEST_ASSERT_FALSE(out.touch_calibrado);
 }
 

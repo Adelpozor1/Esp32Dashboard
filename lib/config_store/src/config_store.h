@@ -18,7 +18,8 @@ struct Config {
   ModoVista modo = ModoVista::CARRUSEL;
   uint16_t  intervalo_carrusel_s = 10;
   uint8_t   vista_fija = 0;
-  std::vector<uint8_t> vistas_orden = {0, 1, 2, 3, 4, 5};
+  // Ids: 0=Radar, 2=Meteo, 3=Futbol, 4=MotoGP, 5=F1. (Id 1=Reloj eliminado 2026-09-07.)
+  std::vector<uint8_t> vistas_orden = {0, 2, 3, 4, 5};
 
   int16_t touch_min_x = 0;
   int16_t touch_max_x = 0;

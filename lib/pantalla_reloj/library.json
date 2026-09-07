@@ -1,8 +1,0 @@
-{
-  "name": "pantalla_reloj",
-  "version": "0.1.0",
-  "description": "Vista Reloj digital con NTP y zona Europe/Madrid",
-  "dependencies": {
-    "bodmer/TFT_eSPI": "^2.5.43"
-  }
-}

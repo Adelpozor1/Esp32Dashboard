@@ -54,7 +54,12 @@ bool PantallaFutbol::tapEnBotonToggle(int x, int y) const {
 void PantallaFutbol::alTocar(int x, int y) {
   if (tapEnBotonToggle(x, y) && onToggle_) {
     onToggle_();
+    return;
   }
+  // Tap fuera del botón alterna la sub-vista (jornada actual ↔ próxima).
+  sub_ = (sub_ == SubVista::JORNADA_ACTUAL) ? SubVista::PROXIMA_JORNADA
+                                             : SubVista::JORNADA_ACTUAL;
+  dirty_ = true;
 }
 
 void PantallaFutbol::dibujar(uint32_t /*msAhora*/) {

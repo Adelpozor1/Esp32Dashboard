@@ -3,6 +3,7 @@
 #include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <algorithm>
 
 #include "config_store.h"
 #include "http_client.h"
@@ -20,7 +21,7 @@
 #include "pantalla_radar.h"
 #include "pantalla_menu.h"
 #include "pantalla_proximamente.h"
-#include "pantalla_reloj.h"
+// Reloj eliminado (2026-09-07) — consumía tarea y no se usaba.
 #include "pantalla_meteo.h"
 #include "meteo_client.h"
 #include "pantalla_futbol.h"
@@ -210,7 +211,7 @@ void tareaDeportesRefresh(void*) {
         todoOk = false;
         Serial.println("[futbol] refresh FALLO");
       }
-      vTaskDelay(pdMS_TO_TICKS(10000));
+      vTaskDelay(pdMS_TO_TICKS(12000));
 
       // --- MotoGP ---
       MotogpSnapshot nm;
@@ -226,7 +227,7 @@ void tareaDeportesRefresh(void*) {
         todoOk = false;
         Serial.println("[motogp] refresh FALLO");
       }
-      vTaskDelay(pdMS_TO_TICKS(10000));
+      vTaskDelay(pdMS_TO_TICKS(12000));
 
       // --- F1 ---
       F1Snapshot n1;
@@ -320,7 +321,6 @@ void modoRadar() {
 
   // Construir pantallas.
   auto* radar   = new PantallaRadar(*g_estado);
-  auto* reloj   = new PantallaReloj();
   auto* meteo   = new PantallaMeteo(g_snapMeteo);
   auto* futbol  = new PantallaFutbol(g_snapFutbol, []() {
     // Toggle Champions/LaLiga: cambia competición y despierta la task de deportes
@@ -355,14 +355,13 @@ void modoRadar() {
   // Menú (home).
   auto* menu = new PantallaMenu(gestor, ajustes);
   menu->configurarEntradas({
-    {0, "Radar"}, {1, "Reloj"}, {2, "Meteo"},
+    {0, "Radar"}, {2, "Meteo"},
     {3, "Futbol"}, {4, "MotoGP"}, {5, "F1"},
   });
 
   gestor.setHome(menu);
   pantallas::Pantalla* aRegistrar[] = {
     static_cast<pantallas::Pantalla*>(radar),
-    static_cast<pantallas::Pantalla*>(reloj),
     static_cast<pantallas::Pantalla*>(meteo),
     static_cast<pantallas::Pantalla*>(futbol),
     static_cast<pantallas::Pantalla*>(motogp),
@@ -414,6 +413,12 @@ void setup() {
 
   bool tieneCfg = ConfigStore::cargar(g_cfg);
   if (tieneCfg) {
+    // Migración 2026-09-07: id de vista 1 (Reloj) eliminado. Purga del orden
+    // guardado y de la vista_fija si apuntaba a él (fallback a Radar).
+    auto& vo = g_cfg.vistas_orden;
+    vo.erase(std::remove(vo.begin(), vo.end(), (uint8_t)1), vo.end());
+    if (vo.empty()) vo = {0, 2, 3, 4, 5};
+    if (g_cfg.vista_fija == 1) g_cfg.vista_fija = 0;
     if (conectarWifi()) { modoRadar(); return; }
     Serial.println("[wifi] no conecta, entrando en portal");
   } else {
