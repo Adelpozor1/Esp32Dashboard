@@ -2,33 +2,40 @@
 #include "pantalla.h"
 #include "futbol_client.h"
 #include <cstdint>
+#include <functional>
 
 class TFT_eSPI;
 
 class PantallaFutbol : public pantallas::Pantalla {
  public:
-  explicit PantallaFutbol(const FutbolSnapshot& snapshot) : snap_(snapshot) {}
+  // onToggleChampions se llama cuando el usuario tapea el botón "Champions"
+  // (o "LaLiga" si estamos en Champions). El main la usa para cambiar la
+  // competición en el FutbolClient y disparar un refresh inmediato.
+  explicit PantallaFutbol(const FutbolSnapshot& snapshot,
+                          std::function<void()> onToggleChampions = nullptr)
+      : snap_(snapshot), onToggle_(std::move(onToggleChampions)) {}
 
   const char* nombre() const override { return "Futbol"; }
   uint8_t id() const override { return 3; }
 
   void alEntrar() override;
   void alDeslizar(pantallas::Direccion dir) override;
+  void alTocar(int x, int y) override;
   void dibujar(uint32_t msAhora) override;
 
  private:
-  enum class SubVista : uint8_t { RESULTADO = 0, AGENDA = 1 };
+  enum class SubVista : uint8_t { JORNADA_ACTUAL = 0, PROXIMA_JORNADA = 1 };
   void dibujarSinDatos(TFT_eSPI& tft);
-  void dibujarResultado(TFT_eSPI& tft, uint32_t msAhora);
-  void dibujarAgenda(TFT_eSPI& tft);
+  void dibujarJornadaActual(TFT_eSPI& tft);
+  void dibujarProximaJornada(TFT_eSPI& tft);
+  void dibujarCabecera(TFT_eSPI& tft);
   void dibujarIndicador(TFT_eSPI& tft);
-  void dibujarBadgeLive(TFT_eSPI& tft, int x, int y, bool encendido);
+  bool tapEnBotonToggle(int x, int y) const;
   static std::string truncar(const std::string& s, size_t n);
 
   const FutbolSnapshot& snap_;
-  SubVista sub_ = SubVista::RESULTADO;
+  std::function<void()> onToggle_;
+  SubVista sub_ = SubVista::JORNADA_ACTUAL;
   bool     dirty_ = true;
   uint32_t ultObtenidoMs_ = 0;
-  uint32_t ultParpadeoMs_ = 0;
-  bool     badgeEncendido_ = true;
 };

@@ -50,6 +50,11 @@ FutbolSnapshot  g_snapFutbol;
 MotogpSnapshot  g_snapMotogp;
 F1Snapshot      g_snapF1;
 
+// Cliente compartido con la pantalla para poder alternar competición.
+FutbolClient*   g_cliFutbol = nullptr;
+// Handle de la task de deportes para forzar refresh (notificación FreeRTOS).
+TaskHandle_t    g_handleDeportes = nullptr;
+
 // Renderer real: barra superior con "menú" a la izquierda, título centrado, dots
 // del carrusel abajo-derecha del área de contenido.
 class RenderizadorUiReal : public pantallas::IRenderizadorUi {
@@ -176,10 +181,14 @@ void tareaMeteoRefresh(void*) {
 // el WDT. Se agrupan en una sola task secuencial con pausas para que el heap
 // se libere entre peticiones.
 void tareaDeportesRefresh(void*) {
-  FutbolClient cliFut(g_http);
+  static FutbolClient cliFut(g_http);
+  g_cliFutbol = &cliFut;
   MotogpClient cliMot(g_http);
   F1Client     cliF1(g_http);
-  vTaskDelay(pdMS_TO_TICKS(3000));   // gracia mínima: WiFi ya conectado en setup
+  // Gracia inicial 8s: deja que meteo (que arranca a los 5s) termine su TLS
+  // antes de abrir el nuestro. Handshakes concurrentes fragmentan el heap y
+  // disparan abort() en el primer ciclo.
+  vTaskDelay(pdMS_TO_TICKS(8000));
   for (;;) {
     bool todoOk = true;
     if (WiFi.status() == WL_CONNECTED) {
@@ -189,16 +198,18 @@ void tareaDeportesRefresh(void*) {
         nf.obtenido_ms = millis();
         nf.stale = false;
         g_snapFutbol = nf;
-        Serial.printf("[futbol] refresh OK live=%d ultimo=%d hoyManana=%d\n",
-                      g_snapFutbol.hayLive ? 1 : 0,
-                      g_snapFutbol.hayUltimo ? 1 : 0,
-                      (int)g_snapFutbol.hoyManana.size());
+        Serial.printf("[futbol] refresh OK j%d(%d)/j%d(%d) champions=%d\n",
+                      g_snapFutbol.jornadaActual,
+                      (int)g_snapFutbol.partidosJornada.size(),
+                      g_snapFutbol.jornadaSiguiente,
+                      (int)g_snapFutbol.partidosSiguiente.size(),
+                      g_snapFutbol.hayChampionsDisponible ? 1 : 0);
       } else {
         g_snapFutbol.stale = true;
         todoOk = false;
         Serial.println("[futbol] refresh FALLO");
       }
-      vTaskDelay(pdMS_TO_TICKS(5000));
+      vTaskDelay(pdMS_TO_TICKS(10000));
 
       // --- MotoGP ---
       MotogpSnapshot nm;
@@ -214,7 +225,7 @@ void tareaDeportesRefresh(void*) {
         todoOk = false;
         Serial.println("[motogp] refresh FALLO");
       }
-      vTaskDelay(pdMS_TO_TICKS(5000));
+      vTaskDelay(pdMS_TO_TICKS(10000));
 
       // --- F1 ---
       F1Snapshot n1;
@@ -233,11 +244,12 @@ void tareaDeportesRefresh(void*) {
     } else {
       todoOk = false;
     }
-    // Backoff dinámico: si todo OK esperamos 3h; si algo falló reintentamos en 5 min
-    // para que el usuario no vea "sin datos" durante horas por un fallo puntual.
+    // Backoff dinámico: si todo OK esperamos 3h; si algo falló reintentamos en 5 min.
+    // La espera se interrumpe si alguien (p.ej. toggle Champions en la pantalla)
+    // llama xTaskNotifyGive(g_handleDeportes) — así el refresh es inmediato.
     const uint32_t espera_ms = todoOk ? (3UL * 3600UL * 1000UL)
                                        : (5UL * 60UL * 1000UL);
-    vTaskDelay(pdMS_TO_TICKS(espera_ms));
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(espera_ms));
   }
 }
 
@@ -262,7 +274,19 @@ void modoRadar() {
   auto* radar   = new PantallaRadar(*g_estado);
   auto* reloj   = new PantallaReloj();
   auto* meteo   = new PantallaMeteo(g_snapMeteo);
-  auto* futbol  = new PantallaFutbol(g_snapFutbol);
+  auto* futbol  = new PantallaFutbol(g_snapFutbol, []() {
+    // Toggle Champions/LaLiga: cambia competición y despierta la task de deportes
+    // para que haga fetch inmediato en la nueva competición.
+    if (!g_cliFutbol) return;
+    Competicion actual = g_cliFutbol->getCompeticion();
+    g_cliFutbol->setCompeticion(actual == Competicion::LALIGA
+                                ? Competicion::CHAMPIONS
+                                : Competicion::LALIGA);
+    // Reset del snapshot para que la pantalla muestre "Cargando..." mientras.
+    g_snapFutbol.ok = false;
+    g_snapFutbol.obtenido_ms = 0;
+    if (g_handleDeportes) xTaskNotifyGive(g_handleDeportes);
+  });
   auto* motogp  = new PantallaMotogp(g_snapMotogp);
   auto* f1      = new PantallaF1(g_snapF1);
 
@@ -320,7 +344,8 @@ void modoRadar() {
   xTaskCreatePinnedToCore(tareaPoller,  "poller",  8192, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(tareaDisplay, "display", 4096, nullptr, 1, nullptr, 1);
   xTaskCreatePinnedToCore(tareaMeteoRefresh, "meteo", 6144, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(tareaDeportesRefresh, "deportes", 20480, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(tareaDeportesRefresh, "deportes", 20480, nullptr, 1,
+                          &g_handleDeportes, 0);
   Serial.println("[radar] modo operativo con carrusel");
 }
 

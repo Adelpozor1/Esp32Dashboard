@@ -81,32 +81,104 @@ bool MotogpClient::parsearEventos(const std::string& json,
   return true;
 }
 
+bool MotogpClient::parsearUltimaRondaYSeason(const std::string& json,
+                                             int& outRonda,
+                                             std::string& outSeason) {
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return false;
+  auto ev = doc["events"].as<JsonArrayConst>();
+  if (ev.isNull() || ev.size() == 0) return false;
+  auto e = ev[0];
+  outRonda = std::atoi(valOrEmpty(e["intRound"]).c_str());
+  outSeason = valOrEmpty(e["strSeason"]);
+  return outRonda > 0 && !outSeason.empty();
+}
+
+std::string MotogpClient::extraerPaisDeSesion(const std::string& s) {
+  // Buscar la primera aparición de cualquier sufijo de sesión/GP y quedarnos
+  // con el prefijo. Aceptamos también "GP" y "Grand Prix" para past.
+  static const char* SUFIJOS[] = {
+    " Free Practice", " Practice", " Sprint Race", " Sprint",
+    " Qualifying", " Warm Up", " Warm-up", " Race",
+    " Grand Prix", " GP", " Test", " Shakedown"
+  };
+  size_t corte = std::string::npos;
+  for (const char* suf : SUFIJOS) {
+    size_t p = s.find(suf);
+    if (p != std::string::npos && p < corte) corte = p;
+  }
+  std::string out = (corte == std::string::npos) ? s : s.substr(0, corte);
+  // trim derecha
+  while (!out.empty() && (out.back() == ' ' || out.back() == '\t')) out.pop_back();
+  return out;
+}
+
+bool MotogpClient::parsearRondaComoGp(const std::string& json, EventoMotor& out) {
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return false;
+  auto ev = doc["events"].as<JsonArrayConst>();
+  if (ev.isNull() || ev.size() == 0) return false;
+  std::string pais;
+  std::string fechaMax;
+  std::string horaCarrera;
+  for (JsonVariantConst it : ev) {
+    std::string nombre = valOrEmpty(it["strEvent"]);
+    if (pais.empty() && !nombre.empty()) pais = extraerPaisDeSesion(nombre);
+    std::string f = valOrEmpty(it["dateEvent"]);
+    if (f.size() >= 10 && f > fechaMax) {
+      fechaMax = f;
+      horaCarrera = valOrEmpty(it["strTime"]);
+    }
+  }
+  if (pais.empty() || fechaMax.empty()) return false;
+  out.nombre = pais + " GP";
+  out.fechaHora = componerFechaHora(fechaMax, horaCarrera);
+  out.ganador.clear();
+  out.resultado.clear();
+  return true;
+}
+
 bool MotogpClient::fetch(MotogpSnapshot& out) {
   const char* URL_PAST = "https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=4407";
-  const char* URL_NEXT = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=4407";
   std::string body; int status = 0;
 
-  std::vector<EventoMotor> ultimos;
   if (!http_.get(URL_PAST, body, status, 20000) || status != 200 || body.empty()) {
 #ifdef ARDUINO
     ::Serial.printf("[motogp] past fallo status=%d body=%u\n", status, (unsigned)body.size());
 #endif
     return false;
   }
+  std::vector<EventoMotor> ultimos;
   if (!parsearEventos(body, ultimos, 5)) return false;
+  int ultimaRonda = 0;
+  std::string season;
+  parsearUltimaRondaYSeason(body, ultimaRonda, season);
 
-  body.clear();
+  // TheSportsDB no expone el "GP raíz" para rondas futuras; sólo sesiones
+  // sueltas (FP, Qualifying, Sprint...). Componemos un "GP virtual" pidiendo
+  // eventsround.php por cada una de las próximas 3 rondas y agrupando.
   std::vector<EventoMotor> proximos;
-  if (!http_.get(URL_NEXT, body, status, 20000) || status != 200 || body.empty()) {
+  if (ultimaRonda > 0 && !season.empty()) {
+    for (int r = ultimaRonda + 1; r <= ultimaRonda + 3; ++r) {
+      char url[160];
+      std::snprintf(url, sizeof(url),
+        "https://www.thesportsdb.com/api/v1/json/3/eventsround.php?id=4407&r=%d&s=%s",
+        r, season.c_str());
+      body.clear();
+      status = 0;
+      if (!http_.get(url, body, status, 20000) || status != 200 || body.empty()) {
 #ifdef ARDUINO
-    ::Serial.printf("[motogp] next fallo status=%d body=%u\n", status, (unsigned)body.size());
+        ::Serial.printf("[motogp] ronda %d fallo status=%d\n", r, status);
 #endif
-    return false;
+        continue;
+      }
+      EventoMotor gp;
+      if (parsearRondaComoGp(body, gp)) proximos.push_back(gp);
+    }
   }
-  if (!parsearEventos(body, proximos, 5)) return false;
 
   out.ultimos  = std::move(ultimos);
   out.proximos = std::move(proximos);
-  out.ok = true;
-  return true;
+  out.ok = !out.ultimos.empty() || !out.proximos.empty();
+  return out.ok;
 }

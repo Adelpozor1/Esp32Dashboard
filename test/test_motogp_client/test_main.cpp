@@ -44,11 +44,53 @@ void test_parsear_respeta_maxN(void) {
   TEST_ASSERT_EQUAL(1, (int)v.size());
 }
 
+void test_extraer_pais_de_sesion(void) {
+  TEST_ASSERT_EQUAL_STRING("San Marino",
+      MotogpClient::extraerPaisDeSesion("San Marino Free Practice 1").c_str());
+  TEST_ASSERT_EQUAL_STRING("Thailand",
+      MotogpClient::extraerPaisDeSesion("Thailand Sprint Race").c_str());
+  TEST_ASSERT_EQUAL_STRING("Portugal",
+      MotogpClient::extraerPaisDeSesion("Portugal Qualifying 2").c_str());
+  TEST_ASSERT_EQUAL_STRING("Aragón",
+      MotogpClient::extraerPaisDeSesion("Aragón GP").c_str());
+  TEST_ASSERT_EQUAL_STRING("Spanish",
+      MotogpClient::extraerPaisDeSesion("Spanish Grand Prix").c_str());
+}
+
+static const char* PAYLOAD_RONDA_14 = R"({"events":[
+  {"strEvent":"San Marino Free Practice 1","dateEvent":"2026-09-11","strTime":"08:45:00","intRound":"14","strSeason":"2026"},
+  {"strEvent":"San Marino Practice","dateEvent":"2026-09-11","strTime":"13:00:00","intRound":"14","strSeason":"2026"},
+  {"strEvent":"San Marino Sprint Race","dateEvent":"2026-09-12","strTime":"13:00:00","intRound":"14","strSeason":"2026"},
+  {"strEvent":"San Marino Qualifying 1","dateEvent":"2026-09-12","strTime":"08:50:00","intRound":"14","strSeason":"2026"},
+  {"strEvent":"San Marino Qualifying 2","dateEvent":"2026-09-13","strTime":"09:15:00","intRound":"14","strSeason":"2026"}
+]})";
+
+void test_parsear_ronda_como_gp(void) {
+  EventoMotor gp;
+  TEST_ASSERT_TRUE(MotogpClient::parsearRondaComoGp(PAYLOAD_RONDA_14, gp));
+  TEST_ASSERT_EQUAL_STRING("San Marino GP", gp.nombre.c_str());
+  // Fecha máxima = 2026-09-13 (domingo).
+  TEST_ASSERT_TRUE(gp.fechaHora.find("13 sep") != std::string::npos);
+}
+
+void test_parsear_ultima_ronda_y_season(void) {
+  static const char* PAST = R"({"events":[
+    {"strEvent":"Aragón GP","dateEvent":"2026-08-30","intRound":"13","strSeason":"2026"}
+  ]})";
+  int r = 0; std::string s;
+  TEST_ASSERT_TRUE(MotogpClient::parsearUltimaRondaYSeason(PAST, r, s));
+  TEST_ASSERT_EQUAL(13, r);
+  TEST_ASSERT_EQUAL_STRING("2026", s.c_str());
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_parsear_eventos_past);
   RUN_TEST(test_parsear_eventos_proximos);
   RUN_TEST(test_parsear_json_malformado);
   RUN_TEST(test_parsear_respeta_maxN);
+  RUN_TEST(test_extraer_pais_de_sesion);
+  RUN_TEST(test_parsear_ronda_como_gp);
+  RUN_TEST(test_parsear_ultima_ronda_y_season);
   return UNITY_END();
 }
