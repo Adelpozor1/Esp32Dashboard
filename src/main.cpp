@@ -330,7 +330,7 @@ void modoRadar() {
   auto* intervalo    = new PantallaIntervalo(gestor, g_cfg);
   auto* selVistas    = new PantallaSeleccionVistas(gestor, g_cfg);
   auto* selVistaFija = new PantallaSeleccionVistaFija(gestor, g_cfg);
-  auto* configLoc    = new PantallaConfigLocalizacion(gestor);
+  auto* configLoc    = new PantallaConfigLocalizacion(gestor, g_cfg);
   auto* calibrar     = new PantallaCalibrarTouch(gestor, g_cfg);
   auto* confReset    = new PantallaConfirmarReset(gestor);
   PantallaAjustes::SubPantallas subs{intervalo, selVistas, selVistaFija,
@@ -417,7 +417,7 @@ void setup() {
   std::string ap = std::string("RadarVuelos-") + sufijo;
   // El portal sigue reutilizando el helper QR ya existente.
   // (`WifiPortal::ejecutar` pinta su propia UI internamente.)
-  WifiPortal::ejecutar(g_http);  // no retorna
+  WifiPortal::ejecutar(g_http, tieneCfg ? &g_cfg : nullptr);  // no retorna
 }
 
 void loop() { delay(1000); }

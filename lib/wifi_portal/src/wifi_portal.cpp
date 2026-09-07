@@ -180,7 +180,7 @@ void tareaScanPortal(void*) {
 
 }  // namespace
 
-void WifiPortal::ejecutar(IHttpClient& http) {
+void WifiPortal::ejecutar(IHttpClient& http, const Config* cfgPrevia) {
   StatusLed::setEstado(EstadoLed::PORTAL);
 
   String ssidAp = String("RadarVuelos-") + macSufijo();
@@ -287,18 +287,32 @@ void WifiPortal::ejecutar(IHttpClient& http) {
   server.begin();
   Serial.println("[portal] esperando configuración...");
 
-  // Pintar QR del AP en pantalla (antes vivía en DisplayRadar::pintarPortalQR).
+  // Pintar QR del AP en pantalla con datos de conexión + ajustes previos si
+  // teníamos config guardada (WiFi cambió, la placa cayó al portal para que
+  // el usuario reintroduzca las credenciales).
   {
+    auto trunc = [](const std::string& s, size_t n) {
+      if (s.size() <= n) return s;
+      return s.substr(0, n - 1) + ".";
+    };
     std::vector<std::string> lineas = {
-      "1. WiFi:",
+      "AP abierto:",
       ssidAp.c_str(),
       "",
-      "2. Escanea",
-      "   el QR",
+      "IP: 192.168.4.1",
       "",
-      "o abre la",
-      "URL a mano",
     };
+    if (cfgPrevia) {
+      char radioBuf[16];
+      std::snprintf(radioBuf, sizeof(radioBuf), "%d km", cfgPrevia->radio_km);
+      lineas.push_back("ANTERIOR:");
+      lineas.push_back(std::string("WiFi:  ") + trunc(cfgPrevia->ssid, 8));
+      lineas.push_back(std::string("Lugar: ") + trunc(cfgPrevia->direccion, 8));
+      lineas.push_back(std::string("Radio: ") + radioBuf);
+    } else {
+      lineas.push_back("Escanea el QR");
+      lineas.push_back("con el movil");
+    }
     qr_view::pintarPortalConQR(tft_driver::obtenerTft(), "Modo Portal",
                                "http://192.168.4.1/", lineas);
   }

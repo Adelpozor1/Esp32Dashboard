@@ -35,14 +35,22 @@ void PantallaConfigLocalizacion::dibujar(uint32_t) {
   }
 
   std::string url = std::string("http://") + WiFi.localIP().toString().c_str() + "/config";
+  // Truncamos strings largos para no romper el layout lateral (~14 chars max).
+  auto trunc = [](const std::string& s, size_t n) {
+    if (s.size() <= n) return s;
+    return s.substr(0, n - 1) + ".";
+  };
+  char radioBuf[16];
+  std::snprintf(radioBuf, sizeof(radioBuf), "%d km", cfg_.radio_km);
   std::vector<std::string> lineas = {
-    "Escanea con",
-    "el movil (en",
-    "la misma WiFi)",
+    "ACTUAL:",
+    std::string("WiFi:  ") + trunc(cfg_.ssid, 8),
+    std::string("Lugar: ") + trunc(cfg_.direccion, 8),
+    std::string("Radio: ") + radioBuf,
+    std::string("IP: ") + WiFi.localIP().toString().c_str(),
     "",
-    "Podras cambiar",
-    "WiFi, direccion",
-    "y radio.",
+    "Escanea para",
+    "cambiarlos",
     "",
     "URL:",
     url,
