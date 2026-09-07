@@ -14,7 +14,7 @@ struct MeteoSnapshot {
   int      viento_kmh = 0;
   bool     stale = false;
   struct Hora { int8_t hora; float temp_c; int codigo; };
-  struct Dia  { int8_t dia_mes; float tmin; float tmax; int codigo; };
+  struct Dia  { int8_t dia_mes; int8_t mes; int8_t dia_semana; float tmin; float tmax; int codigo; };
   std::vector<Hora> horas;
   std::vector<Dia>  dias;
 };

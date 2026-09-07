@@ -11,12 +11,21 @@ struct EventoMotor {
   std::string resultado;
 };
 
+struct MotogpPilotoClas {
+  int         posicion = 0;
+  std::string nombre;    // "Jorge Martin"
+  std::string equipo;    // "Aprilia Racing"
+  std::string marca;     // "Aprilia" (constructor, para color)
+  int         puntos = 0;
+};
+
 struct MotogpSnapshot {
   bool     ok = false;
   uint32_t obtenido_ms = 0;
   bool     stale = false;
   std::vector<EventoMotor> ultimos;
   std::vector<EventoMotor> proximos;
+  std::vector<MotogpPilotoClas> clasificacion;
 };
 
 class MotogpClient {
@@ -42,6 +51,12 @@ class MotogpClient {
   // virtual "GP" con nombre=pais + " GP" y fechaHora del máximo dateEvent
   // (domingo = carrera). Devuelve false si el JSON no tiene eventos.
   static bool parsearRondaComoGp(const std::string& json, EventoMotor& out);
+
+  // Parsea el JSON de api.motogp.pulselive.com/motogp/v1/results/standings.
+  // Rellena top `maxN` pilotos con posicion, nombre, equipo, marca, puntos.
+  static bool parsearClasificacion(const std::string& json,
+                                   std::vector<MotogpPilotoClas>& out,
+                                   size_t maxN);
 
  private:
   IHttpClient& http_;

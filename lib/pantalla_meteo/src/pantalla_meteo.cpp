@@ -17,6 +17,10 @@ constexpr uint16_t COL_LLUV  = 0x5D9F;
 constexpr uint16_t COL_TORM  = 0xFEA0;
 constexpr uint16_t COL_NIEV  = 0xFFFF;
 
+const char* MESES[13] = {"", "ene","feb","mar","abr","may","jun",
+                         "jul","ago","sep","oct","nov","dic"};
+const char* DIAS[7]   = {"Dom","Lun","Mar","Mie","Jue","Vie","Sab"};
+
 void pintarFondo(TFT_eSPI& tft) {
   tft.fillRect(0, OFFSET_Y, W, H_CONTENIDO, paleta_dark::COL_FONDO);
 }
@@ -25,13 +29,6 @@ void pintarFondo(TFT_eSPI& tft) {
 void PantallaMeteo::alEntrar() {
   dirty_ = true;
   ultObtenidoMs_ = 0;
-}
-
-void PantallaMeteo::alDeslizar(pantallas::Direccion dir) {
-  if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
-    sub_ = (sub_ == SubVista::HORAS) ? SubVista::DIAS : SubVista::HORAS;
-    dirty_ = true;
-  }
 }
 
 void PantallaMeteo::dibujar(uint32_t) {
@@ -45,8 +42,7 @@ void PantallaMeteo::dibujar(uint32_t) {
     ultObtenidoMs_ = snap_.obtenido_ms;
     return;
   }
-  if (sub_ == SubVista::HORAS) dibujarHoras(tft);
-  else                          dibujarDias(tft);
+  dibujarVista(tft);
   dirty_ = false;
   ultObtenidoMs_ = snap_.obtenido_ms;
 }
@@ -55,95 +51,106 @@ void PantallaMeteo::dibujarSinDatos(TFT_eSPI& tft) {
   pintarFondo(tft);
   tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
   tft.setTextFont(4);
-  const char* t = "Meteo: sin datos";
+  const char* t = (snap_.obtenido_ms == 0) ? "Cargando datos..." : "Meteo: sin datos";
   int16_t w = tft.textWidth(t);
   tft.setCursor((W - w) / 2, OFFSET_Y + 90);
   tft.print(t);
 }
 
-void PantallaMeteo::dibujarBloqueActual(TFT_eSPI& tft) {
-  char buf[16];
+void PantallaMeteo::dibujarVista(TFT_eSPI& tft) {
+  pintarFondo(tft);
+  dibujarHoy(tft);
+  dibujarProximosDias(tft);
+}
+
+void PantallaMeteo::dibujarHoy(TFT_eSPI& tft) {
+  // Panel superior (aprox 100 px de alto): temperatura grande + icono + viento.
+  char buf[24];
+
+  // Temperatura actual en font 7 (LCD grande).
   std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(std::round(snap_.temp_actual_c)));
-  tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
   tft.setTextFont(7);
-  tft.setCursor(14, OFFSET_Y + 14);
+  tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+  tft.setCursor(14, OFFSET_Y + 8);
   tft.print(buf);
   const int xTemp = 14 + tft.textWidth(buf);
   tft.setTextFont(4);
   tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-  tft.setCursor(xTemp + 4, OFFSET_Y + 24);
+  tft.setCursor(xTemp + 4, OFFSET_Y + 18);
   tft.print("\xB0" "C");
-  dibujarIcono(tft, 250, OFFSET_Y + 46, 60, snap_.codigo_actual);
-  tft.setTextFont(2);
-  tft.setCursor(14, OFFSET_Y + 78);
-  std::snprintf(buf, sizeof(buf), "Viento %d km/h", snap_.viento_kmh);
-  tft.print(buf);
-}
 
-void PantallaMeteo::dibujarHoras(TFT_eSPI& tft) {
-  pintarFondo(tft);
-  dibujarBloqueActual(tft);
-  dibujarIndicador(tft);
-  const int n = std::min<int>(6, static_cast<int>(snap_.horas.size()));
-  const int slot = W / 6;
-  for (int i = 0; i < n; ++i) {
-    const size_t idx = static_cast<size_t>(i) * 2 < snap_.horas.size() ? i * 2 : i;
-    const auto& h = snap_.horas[idx];
-    const int cx = slot * i + slot / 2;
-    char buf[8];
-    std::snprintf(buf, sizeof(buf), "%02d", h.hora);
-    tft.setTextFont(1);
-    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    int16_t wh = tft.textWidth(buf);
-    tft.setCursor(cx - wh / 2, OFFSET_Y + 118);
-    tft.print(buf);
-    dibujarIcono(tft, cx, OFFSET_Y + 148, 22, h.codigo);
-    tft.setTextFont(2);
+  // Icono actual grande a la derecha.
+  dibujarIcono(tft, 250, OFFSET_Y + 40, 60, snap_.codigo_actual);
+
+  // Etiqueta "Hoy" + min/max si tenemos el día actual en snap_.dias[0].
+  tft.setTextFont(2);
+  tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+  tft.setCursor(14, OFFSET_Y + 70);
+  tft.print("Hoy");
+  if (!snap_.dias.empty()) {
+    const auto& h = snap_.dias[0];
+    std::snprintf(buf, sizeof(buf), "%d\xB0 / %d\xB0",
+                  static_cast<int>(std::round(h.tmin)),
+                  static_cast<int>(std::round(h.tmax)));
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    std::snprintf(buf, sizeof(buf), "%d", static_cast<int>(std::round(h.temp_c)));
-    int16_t wt = tft.textWidth(buf);
-    tft.setCursor(cx - wt / 2, OFFSET_Y + 180);
+    tft.setCursor(50, OFFSET_Y + 70);
     tft.print(buf);
   }
+
+  // Viento a la derecha (bajo el icono).
+  std::snprintf(buf, sizeof(buf), "Viento %d km/h", snap_.viento_kmh);
+  tft.setTextFont(2);
+  tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+  int16_t wV = tft.textWidth(buf);
+  tft.setCursor(W - 10 - wV, OFFSET_Y + 88);
+  tft.print(buf);
+
+  // Separador entre bloque hoy y lista.
+  tft.drawFastHLine(6, OFFSET_Y + 105, W - 12, paleta_dark::COL_CAJA);
 }
 
-void PantallaMeteo::dibujarDias(TFT_eSPI& tft) {
-  pintarFondo(tft);
-  dibujarBloqueActual(tft);
-  dibujarIndicador(tft);
-  const int n = std::min<int>(5, static_cast<int>(snap_.dias.size()));
-  int y = OFFSET_Y + 110;
-  tft.setTextFont(2);
+void PantallaMeteo::dibujarProximosDias(TFT_eSPI& tft) {
+  // Lista de 4 días siguientes a hoy (snap_.dias[1..4]) con fecha, icono y min/max.
+  const int inicio = 1;   // saltamos hoy
+  const int nDisp = std::max<int>(0, static_cast<int>(snap_.dias.size()) - inicio);
+  const int n = std::min<int>(4, nDisp);
+  const int filaH = 26;
+  int y = OFFSET_Y + 114;
   char buf[24];
   for (int i = 0; i < n; ++i) {
-    const auto& d = snap_.dias[i];
-    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
-    std::snprintf(buf, sizeof(buf), "%02d", d.dia_mes);
-    tft.setCursor(20, y);
-    tft.print(buf);
-    dibujarIcono(tft, 90, y + 10, 18, d.codigo);
+    const auto& d = snap_.dias[inicio + i];
+    // Día semana (Lun/Mar/…) con protección de rango.
+    const int wd = (d.dia_semana >= 0 && d.dia_semana < 7) ? d.dia_semana : 0;
+    tft.setTextFont(2);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    std::snprintf(buf, sizeof(buf), "%d\xB0 - %d\xB0",
+    tft.setCursor(10, y + 4);
+    tft.print(DIAS[wd]);
+    // Fecha "d mmm"
+    const int mes = (d.mes >= 1 && d.mes <= 12) ? d.mes : 0;
+    std::snprintf(buf, sizeof(buf), "%d %s", d.dia_mes, MESES[mes]);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    tft.setCursor(70, y + 4);
+    tft.print(buf);
+    // Icono
+    dibujarIcono(tft, 170, y + 12, 18, d.codigo);
+    // Min/max a la derecha
+    std::snprintf(buf, sizeof(buf), "%d\xB0 / %d\xB0",
                   static_cast<int>(std::round(d.tmin)),
                   static_cast<int>(std::round(d.tmax)));
-    tft.setCursor(140, y);
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
+    int16_t wt = tft.textWidth(buf);
+    tft.setCursor(W - 12 - wt, y + 4);
     tft.print(buf);
-    y += 22;
+    y += filaH;
   }
-}
-
-void PantallaMeteo::dibujarIndicador(TFT_eSPI& tft) {
-  const int y = OFFSET_Y + 6;
-  const int r = 3;
-  const int xA = W - 22;
-  const int xB = W - 10;
-  const bool horas = (sub_ == SubVista::HORAS);
-  if (horas) {
-    tft.fillCircle(xA, y, r, paleta_dark::COL_ACENTO);
-    tft.drawCircle(xB, y, r, paleta_dark::COL_TXT_SECUND);
-  } else {
-    tft.drawCircle(xA, y, r, paleta_dark::COL_TXT_SECUND);
-    tft.fillCircle(xB, y, r, paleta_dark::COL_ACENTO);
+  if (n == 0) {
+    tft.setTextFont(2);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    const char* t = "(sin prevision)";
+    int16_t w = tft.textWidth(t);
+    tft.setCursor((W - w) / 2, OFFSET_Y + 150);
+    tft.print(t);
   }
 }
 
@@ -177,9 +184,9 @@ void PantallaMeteo::dibujarIcono(TFT_eSPI& tft, int cx, int cy, int lado, int wm
       tft.fillRect(cx - r, cy - 2, 2 * r, r / 2 + 1, COL_NUBE);
       const int y1 = cy + r / 2 + 1;
       const int y2 = y1 + std::max(3, lado / 6);
-      tft.drawLine(cx - r / 2, y1, cx - r / 2, y2, COL_LLUV);
-      tft.drawLine(cx,         y1, cx,         y2, COL_LLUV);
-      tft.drawLine(cx + r / 2, y1, cx + r / 2, y2, COL_LLUV);
+      tft.drawLine(cx - r / 2, y1, cx - r / 2 - 2, y2, COL_LLUV);
+      tft.drawLine(cx,         y1, cx - 2,         y2, COL_LLUV);
+      tft.drawLine(cx + r / 2, y1, cx + r / 2 - 2, y2, COL_LLUV);
       break;
     }
     case IconoMeteo::NIEVE: {
@@ -209,7 +216,6 @@ void PantallaMeteo::dibujarIcono(TFT_eSPI& tft, int cx, int cy, int lado, int wm
       break;
     }
     case IconoMeteo::SOL_NUBE: {
-      // Sol amarillo pequeño arriba-izquierda + nube gris solapando abajo-derecha.
       const int rSol = r - 2;
       const int solCx = cx - r / 2;
       const int solCy = cy - r / 3;
@@ -222,7 +228,6 @@ void PantallaMeteo::dibujarIcono(TFT_eSPI& tft, int cx, int cy, int lado, int wm
         const int y2 = solCy + int((rSol + lado / 8) * std::sin(rad));
         tft.drawLine(x1, y1, x2, y2, COL_SOL);
       }
-      // Nube (más a la derecha y abajo, solapando el sol)
       const int nCx = cx + r / 3;
       const int nCy = cy + r / 4;
       tft.fillCircle(nCx - r / 2, nCy - 1, r / 2 + 1, COL_NUBE);

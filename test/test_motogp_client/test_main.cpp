@@ -69,8 +69,27 @@ void test_parsear_ronda_como_gp(void) {
   EventoMotor gp;
   TEST_ASSERT_TRUE(MotogpClient::parsearRondaComoGp(PAYLOAD_RONDA_14, gp));
   TEST_ASSERT_EQUAL_STRING("San Marino GP", gp.nombre.c_str());
-  // Fecha máxima = 2026-09-13 (domingo).
-  TEST_ASSERT_TRUE(gp.fechaHora.find("13 sep") != std::string::npos);
+  // Fecha máxima ISO = 2026-09-13 (domingo).
+  TEST_ASSERT_EQUAL_STRING("2026-09-13", gp.fechaHora.c_str());
+}
+
+static const char* PAYLOAD_CLASIFICACION = R"({
+  "classification":[
+    {"position":1,"points":256,"rider":{"full_name":"Jorge Martin"},"team":{"name":"Aprilia Racing"},"constructor":{"name":"Aprilia"}},
+    {"position":2,"points":220,"rider":{"full_name":"Marc Marquez"},"team":{"name":"Ducati Lenovo Team"},"constructor":{"name":"Ducati"}},
+    {"position":3,"points":198,"rider":{"full_name":"Pedro Acosta"},"team":{"name":"Red Bull KTM Factory"},"constructor":{"name":"KTM"}}
+  ]
+})";
+
+void test_parsear_clasificacion_motogp(void) {
+  std::vector<MotogpPilotoClas> v;
+  TEST_ASSERT_TRUE(MotogpClient::parsearClasificacion(PAYLOAD_CLASIFICACION, v, 5));
+  TEST_ASSERT_EQUAL(3, (int)v.size());
+  TEST_ASSERT_EQUAL(1, v[0].posicion);
+  TEST_ASSERT_EQUAL_STRING("Jorge Martin", v[0].nombre.c_str());
+  TEST_ASSERT_EQUAL_STRING("Aprilia Racing", v[0].equipo.c_str());
+  TEST_ASSERT_EQUAL_STRING("Aprilia", v[0].marca.c_str());
+  TEST_ASSERT_EQUAL(256, v[0].puntos);
 }
 
 void test_parsear_ultima_ronda_y_season(void) {
@@ -92,5 +111,6 @@ int main(int, char**) {
   RUN_TEST(test_extraer_pais_de_sesion);
   RUN_TEST(test_parsear_ronda_como_gp);
   RUN_TEST(test_parsear_ultima_ronda_y_season);
+  RUN_TEST(test_parsear_clasificacion_motogp);
   return UNITY_END();
 }

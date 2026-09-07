@@ -37,11 +37,20 @@ std::string PantallaF1::truncar(const std::string& s, size_t n) {
 
 void PantallaF1::alEntrar() { dirty_ = true; ultObtenidoMs_ = 0; }
 
+void PantallaF1::alternarSubVista() {
+  sub_ = (sub_ == SubVista::CALENDARIO) ? SubVista::CLASIFICACION
+                                         : SubVista::CALENDARIO;
+  dirty_ = true;
+}
+
 void PantallaF1::alDeslizar(pantallas::Direccion dir) {
   if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
-    sub_ = (sub_ == SubVista::CLASIFICACION) ? SubVista::CALENDARIO : SubVista::CLASIFICACION;
-    dirty_ = true;
+    alternarSubVista();
   }
+}
+
+void PantallaF1::alTocar(int /*x*/, int /*y*/) {
+  alternarSubVista();
 }
 
 void PantallaF1::dibujar(uint32_t) {
@@ -54,8 +63,8 @@ void PantallaF1::dibujar(uint32_t) {
     dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms;
     return;
   }
-  if (sub_ == SubVista::CLASIFICACION) dibujarClasificacion(tft);
-  else                                  dibujarCalendario(tft);
+  if (sub_ == SubVista::CALENDARIO) dibujarCalendario(tft);
+  else                                dibujarClasificacion(tft);
   dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms;
 }
 
@@ -73,8 +82,8 @@ void PantallaF1::dibujarIndicador(TFT_eSPI& tft) {
   const int y = OFFSET_Y + 6;
   const int r = 3;
   const int xA = W - 22, xB = W - 10;
-  const bool clas = (sub_ == SubVista::CLASIFICACION);
-  if (clas) {
+  const bool cal = (sub_ == SubVista::CALENDARIO);
+  if (cal) {
     tft.fillCircle(xA, y, r, paleta_dark::COL_ACENTO);
     tft.drawCircle(xB, y, r, paleta_dark::COL_TXT_SECUND);
   } else {

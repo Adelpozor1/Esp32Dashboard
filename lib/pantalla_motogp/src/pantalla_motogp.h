@@ -14,14 +14,16 @@ class PantallaMotogp : public pantallas::Pantalla {
 
   void alEntrar() override;
   void alDeslizar(pantallas::Direccion dir) override;
+  void alTocar(int x, int y) override;
   void dibujar(uint32_t msAhora) override;
 
  private:
-  enum class SubVista : uint8_t { ULTIMOS = 0, CALENDARIO = 1 };
+  enum class SubVista : uint8_t { CALENDARIO = 0, CLASIFICACION = 1 };
   void dibujarSinDatos(TFT_eSPI& tft);
-  void dibujarUltimos(TFT_eSPI& tft);
   void dibujarCalendario(TFT_eSPI& tft);
+  void dibujarClasificacion(TFT_eSPI& tft);
   void dibujarIndicador(TFT_eSPI& tft);
+  void alternarSubVista();
   static std::string truncar(const std::string& s, size_t n);
 
   const MotogpSnapshot& snap_;

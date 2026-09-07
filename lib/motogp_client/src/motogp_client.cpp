@@ -7,6 +7,7 @@
 
 #ifdef ARDUINO
 #include <Arduino.h>
+#include <Stream.h>
 #endif
 
 namespace {
@@ -132,9 +133,43 @@ bool MotogpClient::parsearRondaComoGp(const std::string& json, EventoMotor& out)
   }
   if (pais.empty() || fechaMax.empty()) return false;
   out.nombre = pais + " GP";
-  out.fechaHora = componerFechaHora(fechaMax, horaCarrera);
+  // Fecha en formato ISO YYYY-MM-DD, igual que F1 (pantalla lo formatea sola).
+  out.fechaHora = fechaMax;
+  (void)horaCarrera;
   out.ganador.clear();
   out.resultado.clear();
+  return true;
+}
+
+bool MotogpClient::parsearClasificacion(const std::string& json,
+                                        std::vector<MotogpPilotoClas>& out,
+                                        size_t maxN) {
+  out.clear();
+  // El JSON de la API oficial es grande (~24KB) con muchos campos por piloto.
+  // Filtramos con un JsonDocument-filter para descartar los campos que no
+  // usamos y ahorrar heap durante deserializeJson.
+  JsonDocument filter;
+  filter["classification"][0]["position"] = true;
+  filter["classification"][0]["points"] = true;
+  filter["classification"][0]["rider"]["full_name"] = true;
+  filter["classification"][0]["team"]["name"] = true;
+  filter["classification"][0]["constructor"]["name"] = true;
+
+  JsonDocument doc;
+  if (deserializeJson(doc, json, DeserializationOption::Filter(filter))) return false;
+  auto cls = doc["classification"].as<JsonArrayConst>();
+  if (cls.isNull()) return false;
+  for (JsonVariantConst r : cls) {
+    if (out.size() >= maxN) break;
+    MotogpPilotoClas p;
+    p.posicion = r["position"].as<int>();
+    p.puntos   = r["points"].as<int>();
+    p.nombre   = valOrEmpty(r["rider"]["full_name"]);
+    p.equipo   = valOrEmpty(r["team"]["name"]);
+    p.marca    = valOrEmpty(r["constructor"]["name"]);
+    if (p.posicion <= 0) continue;
+    out.push_back(p);
+  }
   return true;
 }
 
@@ -179,6 +214,56 @@ bool MotogpClient::fetch(MotogpSnapshot& out) {
 
   out.ultimos  = std::move(ultimos);
   out.proximos = std::move(proximos);
-  out.ok = !out.ultimos.empty() || !out.proximos.empty();
+
+  // Clasificación del mundial via API oficial motogp.com.
+  // UUIDs de la temporada 2026 (actualizar cada temporada). categoryUuid MotoGP
+  // es estable, pero seasonUuid cambia — consultable en /motogp/v1/results/seasons.
+  //
+  // El body pesa ~24 KB. getString() lo revienta el heap TLS. Usamos streaming:
+  // deserializeJson lee del stream directamente sin acumular String.
+  const char* URL_CLAS =
+    "https://api.motogp.pulselive.com/motogp/v1/results/standings?"
+    "seasonUuid=e88b4e43-2209-47aa-8e83-0e0b1cedde6e&"
+    "categoryUuid=e8c110ad-64aa-4e8e-8a86-f2f152f6a942";
+  status = 0;
+#ifdef ARDUINO
+  bool okClas = http_.getStreamed(URL_CLAS, status, 20000,
+    [&out](void* streamPtr) -> bool {
+      Stream* stream = static_cast<Stream*>(streamPtr);
+      if (!stream) return false;
+      JsonDocument filter;
+      filter["classification"][0]["position"] = true;
+      filter["classification"][0]["points"] = true;
+      filter["classification"][0]["rider"]["full_name"] = true;
+      filter["classification"][0]["team"]["name"] = true;
+      filter["classification"][0]["constructor"]["name"] = true;
+      JsonDocument doc;
+      DeserializationError err = deserializeJson(doc, *stream,
+                                                 DeserializationOption::Filter(filter));
+      if (err) {
+        ::Serial.printf("[motogp] deserializeJson err=%s\n", err.c_str());
+        return false;
+      }
+      auto cls = doc["classification"].as<JsonArrayConst>();
+      if (cls.isNull()) return false;
+      for (JsonVariantConst r : cls) {
+        if (out.clasificacion.size() >= 10) break;
+        MotogpPilotoClas p;
+        p.posicion = r["position"].as<int>();
+        p.puntos   = r["points"].as<int>();
+        p.nombre   = valOrEmpty(r["rider"]["full_name"]);
+        p.equipo   = valOrEmpty(r["team"]["name"]);
+        p.marca    = valOrEmpty(r["constructor"]["name"]);
+        if (p.posicion <= 0) continue;
+        out.clasificacion.push_back(p);
+      }
+      return true;
+    });
+  ::Serial.printf("[motogp] clasificacion %s n=%d status=%d\n",
+                  okClas ? "OK" : "FALLO",
+                  (int)out.clasificacion.size(), status);
+#endif
+
+  out.ok = !out.ultimos.empty() || !out.proximos.empty() || !out.clasificacion.empty();
   return out.ok;
 }

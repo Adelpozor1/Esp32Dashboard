@@ -34,11 +34,20 @@ std::string PantallaMotogp::truncar(const std::string& s, size_t n) {
 
 void PantallaMotogp::alEntrar() { dirty_ = true; ultObtenidoMs_ = 0; }
 
+void PantallaMotogp::alternarSubVista() {
+  sub_ = (sub_ == SubVista::CALENDARIO) ? SubVista::CLASIFICACION
+                                         : SubVista::CALENDARIO;
+  dirty_ = true;
+}
+
 void PantallaMotogp::alDeslizar(pantallas::Direccion dir) {
   if (dir == pantallas::Direccion::ARRIBA || dir == pantallas::Direccion::ABAJO) {
-    sub_ = (sub_ == SubVista::ULTIMOS) ? SubVista::CALENDARIO : SubVista::ULTIMOS;
-    dirty_ = true;
+    alternarSubVista();
   }
+}
+
+void PantallaMotogp::alTocar(int /*x*/, int /*y*/) {
+  alternarSubVista();
 }
 
 void PantallaMotogp::dibujar(uint32_t) {
@@ -50,8 +59,8 @@ void PantallaMotogp::dibujar(uint32_t) {
     dibujarSinDatos(tft);
     dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms; return;
   }
-  if (sub_ == SubVista::ULTIMOS) dibujarUltimos(tft);
-  else                            dibujarCalendario(tft);
+  if (sub_ == SubVista::CALENDARIO) dibujarCalendario(tft);
+  else                                dibujarClasificacion(tft);
   dirty_ = false; ultObtenidoMs_ = snap_.obtenido_ms;
 }
 
@@ -101,76 +110,96 @@ void PantallaMotogp::dibujarCalendario(TFT_eSPI& tft) {
     return;
   }
 
-  const int filaAlto = 44;
+  // Mismo layout que F1: cajas con nombre GP + fecha ISO a la derecha.
+  const int cajaAlto = 44;
   int y = OFFSET_Y + 32;
   for (int i = 0; i < n; ++i) {
     const auto& e = snap_.proximos[i];
-    // Fecha (grande, izquierda)
-    std::string fecha = fechaSinHoraPlaceholder(e.fechaHora);
-    tft.setTextFont(4);
-    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
-    tft.setCursor(10, y + 4);
-    tft.print(truncar(fecha, 12).c_str());
-    // Nombre GP (derecha, título)
+    tft.drawRect(6, y, W - 12, cajaAlto, paleta_dark::COL_CAJA);
+    // Nombre GP
     tft.setTextFont(2);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    std::string nombre = truncar(e.nombre, 16);
-    int16_t wN = tft.textWidth(nombre.c_str());
-    tft.setCursor(W - 10 - wN, y + 12);
-    tft.print(nombre.c_str());
-    // Separador
-    tft.drawFastHLine(0, y + filaAlto, W, paleta_dark::COL_CAJA);
-    y += filaAlto;
+    tft.setCursor(12, y + 4);
+    tft.print(truncar(e.nombre, 22).c_str());
+    // Fecha ISO a la derecha en font 2 acento (los primeros 10 chars = YYYY-MM-DD).
+    std::string f = e.fechaHora.size() >= 10 ? e.fechaHora.substr(0, 10)
+                                              : e.fechaHora;
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wFH = tft.textWidth(f.c_str());
+    tft.setCursor(W - 16 - wFH, y + 14);
+    tft.print(f.c_str());
+    y += cajaAlto + 4;
   }
 }
 
-// Sub-vista 2: Últimos ganadores (chip amarillo con "1", nombre GP, ganador)
-void PantallaMotogp::dibujarUltimos(TFT_eSPI& tft) {
+// Devuelve el color RGB565 aproximado por marca de fabricante.
+static uint16_t colorMarcaMoto(const std::string& m) {
+  if (m == "Ducati")   return 0xF800;  // rojo
+  if (m == "Aprilia")  return 0x001F;  // azul
+  if (m == "KTM")      return 0xFC00;  // naranja
+  if (m == "Yamaha")   return 0x0417;  // azul cyan
+  if (m == "Honda")    return 0xF9E7;  // rojo/blanco
+  return paleta_dark::COL_ACENTO;
+}
+
+// Sub-vista 2: Clasificación del mundial (top 4 pilotos, mismo estilo que F1)
+void PantallaMotogp::dibujarClasificacion(TFT_eSPI& tft) {
   pintarFondo(tft);
   dibujarIndicador(tft);
   tft.setTextFont(2);
   tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
   tft.setCursor(10, OFFSET_Y + 6);
-  tft.print("Ultimas carreras");
+  tft.print("Mundial");
 
-  const int n = std::min<int>(3, static_cast<int>(snap_.ultimos.size()));
-  if (n == 0) {
-    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+  if (snap_.clasificacion.empty()) {
     tft.setTextFont(2);
-    const char* t = "(sin datos)";
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    const char* t = "Clasificacion no disponible";
     int16_t w = tft.textWidth(t);
     tft.setCursor((W - w) / 2, OFFSET_Y + 100);
     tft.print(t);
     return;
   }
 
-  const int filaAlto = 60;
+  const int n = std::min<int>(4, static_cast<int>(snap_.clasificacion.size()));
+  const int filaAlto = 44;
   int y = OFFSET_Y + 32;
   for (int i = 0; i < n; ++i) {
-    const auto& e = snap_.ultimos[i];
-    // Chip amarillo con "1"
-    const uint16_t COL_ORO = 0xFEA0;  // amarillo
-    tft.fillRect(10, y, 26, 26, COL_ORO);
+    const auto& p = snap_.clasificacion[i];
+    // Chip color marca
+    uint16_t col = colorMarcaMoto(p.marca);
+    tft.fillRect(10, y, 26, 26, col);
     tft.setTextFont(4);
-    tft.setTextColor(0x0000, COL_ORO);
-    const char* posStr = "1";
+    tft.setTextColor(0xFFFF, col);
+    char posStr[4];
+    std::snprintf(posStr, sizeof(posStr), "%d", p.posicion);
     int16_t wp = tft.textWidth(posStr);
     tft.setCursor(10 + (26 - wp) / 2, y + 1);
     tft.print(posStr);
 
-    // Nombre GP arriba
-    tft.setTextFont(2);
-    tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    tft.setCursor(46, y + 2);
-    tft.print(truncar(e.nombre, 22).c_str());
-    // Ganador en font 4 abajo
+    // Nombre
     tft.setTextFont(4);
     tft.setTextColor(paleta_dark::COL_TXT_TITULO, paleta_dark::COL_FONDO);
-    tft.setCursor(46, y + 22);
-    tft.print(e.ganador.empty() ? "-" : truncar(e.ganador, 14).c_str());
-
-    // Separador
-    tft.drawFastHLine(0, y + filaAlto - 2, W, paleta_dark::COL_CAJA);
+    tft.setCursor(46, y);
+    tft.print(truncar(p.nombre, 12).c_str());
+    // Equipo debajo
+    tft.setTextFont(1);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    tft.setCursor(46, y + 28);
+    tft.print(truncar(p.equipo, 24).c_str());
+    // Puntos a la derecha
+    char ptsStr[8];
+    std::snprintf(ptsStr, sizeof(ptsStr), "%d", p.puntos);
+    tft.setTextFont(4);
+    tft.setTextColor(paleta_dark::COL_ACENTO, paleta_dark::COL_FONDO);
+    int16_t wpts = tft.textWidth(ptsStr);
+    tft.setCursor(W - 10 - wpts, y);
+    tft.print(ptsStr);
+    tft.setTextFont(1);
+    tft.setTextColor(paleta_dark::COL_TXT_SECUND, paleta_dark::COL_FONDO);
+    int16_t wLbl = tft.textWidth("pts");
+    tft.setCursor(W - 10 - wLbl, y + 28);
+    tft.print("pts");
     y += filaAlto;
   }
 }

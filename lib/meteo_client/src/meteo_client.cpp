@@ -16,6 +16,25 @@ int parseDiaMes(const char* iso) {
   if (!iso || std::strlen(iso) < 10) return -1;
   return (iso[8] - '0') * 10 + (iso[9] - '0');
 }
+int parseMes(const char* iso) {
+  if (!iso || std::strlen(iso) < 10) return -1;
+  return (iso[5] - '0') * 10 + (iso[6] - '0');
+}
+int parseAnio(const char* iso) {
+  if (!iso || std::strlen(iso) < 10) return -1;
+  return (iso[0]-'0')*1000 + (iso[1]-'0')*100 + (iso[2]-'0')*10 + (iso[3]-'0');
+}
+// Devuelve día de la semana (0=Dom..6=Sab) para ISO "YYYY-MM-DD".
+int parseDiaSemana(const char* iso) {
+  int y = parseAnio(iso), m = parseMes(iso), d = parseDiaMes(iso);
+  if (y < 2000 || m < 1 || d < 1) return -1;
+  // Algoritmo de Zeller para calendario gregoriano.
+  if (m < 3) { m += 12; y -= 1; }
+  int k = y % 100, j = y / 100;
+  int h = (d + (13*(m+1))/5 + k + k/4 + j/4 + 5*j) % 7;
+  // Zeller devuelve 0=sábado. Convertimos a 0=domingo.
+  return (h + 6) % 7;
+}
 }  // namespace
 
 IconoMeteo MeteoClient::categoria(int wmo) {
@@ -66,12 +85,15 @@ bool MeteoClient::parsear(const std::string& json, MeteoSnapshot& out) {
   auto dmin = doc["daily"]["temperature_2m_min"].as<JsonArrayConst>();
   auto dwc  = doc["daily"]["weather_code"].as<JsonArrayConst>();
   if (!dt.isNull() && !dmax.isNull() && !dmin.isNull() && !dwc.isNull()) {
-    for (size_t i = 0; i < dt.size() && out.dias.size() < 5; ++i) {
+    for (size_t i = 0; i < dt.size() && out.dias.size() < 6; ++i) {
+      const char* iso = dt[i].as<const char*>();
       MeteoSnapshot::Dia d;
-      d.dia_mes = static_cast<int8_t>(parseDiaMes(dt[i].as<const char*>()));
-      d.tmax    = dmax[i].as<float>();
-      d.tmin    = dmin[i].as<float>();
-      d.codigo  = dwc[i].as<int>();
+      d.dia_mes    = static_cast<int8_t>(parseDiaMes(iso));
+      d.mes        = static_cast<int8_t>(parseMes(iso));
+      d.dia_semana = static_cast<int8_t>(parseDiaSemana(iso));
+      d.tmax       = dmax[i].as<float>();
+      d.tmin       = dmin[i].as<float>();
+      d.codigo     = dwc[i].as<int>();
       out.dias.push_back(d);
     }
   }
