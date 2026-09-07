@@ -35,7 +35,8 @@ void PantallaConfigLocalizacion::dibujar(uint32_t) {
   }
 
   std::string url = std::string("http://") + WiFi.localIP().toString().c_str() + "/config";
-  // Truncamos strings largos para no romper el layout lateral (~14 chars max).
+  // Panel derecho: 80 px de ancho, font 1 → ~15 chars por línea. Truncamos
+  // valores muy largos con "…" para no salirnos.
   auto trunc = [](const std::string& s, size_t n) {
     if (s.size() <= n) return s;
     return s.substr(0, n - 1) + ".";
@@ -43,17 +44,21 @@ void PantallaConfigLocalizacion::dibujar(uint32_t) {
   char radioBuf[16];
   std::snprintf(radioBuf, sizeof(radioBuf), "%d km", cfg_.radio_km);
   std::vector<std::string> lineas = {
-    "ACTUAL:",
-    std::string("WiFi:  ") + trunc(cfg_.ssid, 8),
-    std::string("Lugar: ") + trunc(cfg_.direccion, 8),
+    "ACTUAL",
+    "",
+    "WiFi:",
+    trunc(cfg_.ssid, 14),
+    "",
+    "Lugar:",
+    trunc(cfg_.direccion, 14),
+    "",
     std::string("Radio: ") + radioBuf,
-    std::string("IP: ") + WiFi.localIP().toString().c_str(),
     "",
-    "Escanea para",
-    "cambiarlos",
+    "IP:",
+    std::string(WiFi.localIP().toString().c_str()),
     "",
-    "URL:",
-    url,
+    "Escanea",
+    "para cambiar",
   };
   qr_view::pintarPortalConQR(tft, "Cambiar WiFi/lugar", url, lineas);
   tft.setTextFont(2);
