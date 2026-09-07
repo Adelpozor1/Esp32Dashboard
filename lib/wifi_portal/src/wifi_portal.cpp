@@ -41,18 +41,67 @@ struct DatosGuardar {
   IHttpClient* http;
 };
 
+// Recupera el AP tras un intento fallido de conexión para que el usuario pueda
+// volver a llenar el formulario sin reflashear ni power-cycle.
+static String s_ssidApGuardado;
+void relevantarAP() {
+  Serial.println("[save] relevantando AP para reintento");
+  WiFi.disconnect(true, true);
+  vTaskDelay(pdMS_TO_TICKS(200));
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(s_ssidApGuardado.c_str());
+}
+
+const char* nombreWlStatus(wl_status_t s) {
+  switch (s) {
+    case WL_NO_SHIELD:       return "NO_SHIELD";
+    case WL_IDLE_STATUS:     return "IDLE";
+    case WL_NO_SSID_AVAIL:   return "NO_SSID_AVAIL";
+    case WL_SCAN_COMPLETED:  return "SCAN_COMPLETED";
+    case WL_CONNECTED:       return "CONNECTED";
+    case WL_CONNECT_FAILED:  return "CONNECT_FAILED";
+    case WL_CONNECTION_LOST: return "CONNECTION_LOST";
+    case WL_DISCONNECTED:    return "DISCONNECTED";
+    default:                 return "?";
+  }
+}
+
 void tareaGuardar(void* param) {
   auto* d = static_cast<DatosGuardar*>(param);
-  Serial.printf("[save] conectando a %s...\n", d->ssid.c_str());
+  Serial.printf("[save] preparando STA-only para conectar a '%s'\n", d->ssid.c_str());
+  // Bajamos el AP y limpiamos la STA para que el radio tenga solo un canal que
+  // gestionar. Con AP+STA activos, WiFi.begin a veces falla porque el AP fija
+  // canal e interfiere con el hopping del STA.
+  WiFi.softAPdisconnect(true);
+  WiFi.disconnect(true, true);
+  WiFi.mode(WIFI_STA);
+  vTaskDelay(pdMS_TO_TICKS(300));
+
+  Serial.printf("[save] WiFi.begin('%s')\n", d->ssid.c_str());
   WiFi.begin(d->ssid.c_str(), d->password.c_str());
   uint32_t inicio = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
+  wl_status_t status = WL_IDLE_STATUS;
+  while (millis() - inicio < 30000) {
+    status = WiFi.status();
+    if (status == WL_CONNECTED) break;
+    // WL_NO_SSID_AVAIL sale rápido si el SSID no aparece — no esperamos 30s.
+    if (status == WL_NO_SSID_AVAIL && millis() - inicio > 8000) break;
+    if (status == WL_CONNECT_FAILED) break;
     vTaskDelay(pdMS_TO_TICKS(200));
   }
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[save] WiFi no conecta");
-    s_ultimoError = "No se puede conectar a la WiFi. Comprueba SSID y password.";
+  status = WiFi.status();
+  Serial.printf("[save] tras begin: status=%s (%d)\n",
+                nombreWlStatus(status), (int)status);
+  if (status != WL_CONNECTED) {
+    if (status == WL_NO_SSID_AVAIL) {
+      s_ultimoError = "SSID no encontrado. Comprueba el nombre exacto (mayusculas/minusculas y espacios). Recuerda: el ESP32 solo soporta 2.4 GHz.";
+    } else if (status == WL_CONNECT_FAILED) {
+      s_ultimoError = "Password incorrecta o red rechazando la conexion.";
+    } else {
+      s_ultimoError = "No se puede conectar a la WiFi. Comprueba SSID, password y que la red sea 2.4 GHz (WPA2).";
+    }
     s_estadoGuardar = EstadoGuardar::ERROR;
+    relevantarAP();
     delete d;
     vTaskDelete(nullptr);
     return;
@@ -66,6 +115,7 @@ void tareaGuardar(void* param) {
     Serial.println("[save] geocoding falló");
     s_ultimoError = "Ubicación no encontrada. Prueba con código postal + país (ej: 28013 España).";
     s_estadoGuardar = EstadoGuardar::ERROR;
+    relevantarAP();
     delete d;
     vTaskDelete(nullptr);
     return;
@@ -83,6 +133,7 @@ void tareaGuardar(void* param) {
     Serial.println("[save] error NVS");
     s_ultimoError = "Error guardando en NVS.";
     s_estadoGuardar = EstadoGuardar::ERROR;
+    relevantarAP();
     delete d;
     vTaskDelete(nullptr);
     return;
@@ -99,23 +150,29 @@ void tareaScanPortal(void*) {
     if (s_pedirScan) {
       s_pedirScan = false;
       Serial.println("[scan] ejecutando WiFi.scanNetworks()...");
-      int n = WiFi.scanNetworks(false, false);
+      int n = WiFi.scanNetworks(false, true);
       Serial.printf("[scan] devolvió %d redes\n", n);
-      JsonDocument doc;
-      JsonArray arr = doc.to<JsonArray>();
-      for (int i = 0; i < n && i < 32; ++i) {
-        String ssid = WiFi.SSID(i);
-        if (ssid.length() == 0) continue;
-        JsonObject o = arr.add<JsonObject>();
-        o["ssid"] = ssid;
-        o["rssi"] = WiFi.RSSI(i);
-        o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+      // Si el rescan devuelve 0 (típico en AP+STA), preservamos la cache
+      // anterior — así el usuario no pierde la lista inicial cuando pulsa 🔄.
+      if (n > 0) {
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+        for (int i = 0; i < n && i < 32; ++i) {
+          String ssid = WiFi.SSID(i);
+          if (ssid.length() == 0) continue;
+          JsonObject o = arr.add<JsonObject>();
+          o["ssid"] = ssid;
+          o["rssi"] = WiFi.RSSI(i);
+          o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+        }
+        String out;
+        serializeJson(doc, out);
+        s_scanCache = out;
+        Serial.printf("[scan] cache actualizado (%u bytes)\n", (unsigned)out.length());
+      } else {
+        Serial.println("[scan] devolvió 0 — conservamos cache anterior");
       }
       WiFi.scanDelete();
-      String out;
-      serializeJson(doc, out);
-      s_scanCache = out;
-      Serial.printf("[scan] cache actualizado (%u bytes)\n", (unsigned)out.length());
     }
     vTaskDelay(pdMS_TO_TICKS(500));
   }
@@ -127,13 +184,44 @@ void WifiPortal::ejecutar(IHttpClient& http) {
   StatusLed::setEstado(EstadoLed::PORTAL);
 
   String ssidAp = String("RadarVuelos-") + macSufijo();
-  // AP+STA para poder levantar el portal y a la vez escanear redes cercanas.
+  s_ssidApGuardado = ssidAp;
+
+  // 1) Scan INICIAL en modo STA-only. Con AP+STA el scan a veces devuelve 0
+  //    redes (el radio wifi solo tiene un canal a la vez y el AP fija el canal),
+  //    así que hacemos el primer scan aquí sin el AP para llenar la cache.
+  Serial.println("[portal] scan inicial en STA-only...");
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true, true);
+  vTaskDelay(pdMS_TO_TICKS(200));
+  {
+    int n = WiFi.scanNetworks(false, true);
+    Serial.printf("[portal] scan inicial devolvio %d redes\n", n);
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n && i < 32; ++i) {
+      String ssid = WiFi.SSID(i);
+      if (ssid.length() == 0) continue;
+      JsonObject o = arr.add<JsonObject>();
+      o["ssid"] = ssid;
+      o["rssi"] = WiFi.RSSI(i);
+      o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+    }
+    WiFi.scanDelete();
+    String out;
+    serializeJson(doc, out);
+    s_scanCache = out;
+    s_pedirScan = false;   // ya tenemos algo, no rescan-cortoplacista
+  }
+
+  // 2) Ahora sí subimos AP+STA para el portal.
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ssidAp.c_str());
   Serial.printf("[portal] AP levantado: %s  IP: %s\n",
                 ssidAp.c_str(), WiFi.softAPIP().toString().c_str());
 
-  // Task dedicada de scan en core 1 (fuera del thread async_tcp).
+  // Task dedicada de scan en core 1 (fuera del thread async_tcp). Este scan
+  // corre en AP+STA y puede fallar a veces; la cache inicial del paso 1 nos
+  // asegura que el usuario ve algo en la lista aunque el rescan salga vacío.
   xTaskCreatePinnedToCore(tareaScanPortal, "scan", 4096, nullptr, 1, nullptr, 1);
 
   static AsyncWebServer server(80);
