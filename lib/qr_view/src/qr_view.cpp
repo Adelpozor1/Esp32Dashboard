@@ -87,18 +87,18 @@ void pintarPortalConQR(TFT_eSPI& tft,
   tft.setCursor(6, qrY + lado + 12);
   tft.print(url.c_str());
 
-  // Panel derecho: 80 px de ancho (320-240). Font 1 con interlineado 11 px
-  // para maximizar contenido — hasta ~15 chars por línea y ~19 líneas en total
-  // sin salirnos de los 240 px de alto. Las líneas vacías del vector actúan
-  // como separadores visuales.
-  int py = 26;
+  // Panel derecho: 80 px de ancho (320-240). Font 2 con interlineado 20 px
+  // — ~8 chars por línea, hasta ~10 líneas verticales. Guard para no pintar
+  // fuera de los 240 px de alto. Los callers son responsables de truncar los
+  // strings largos y de no meter más de ~10 líneas.
+  int py = 32;
   tft.setTextColor(COL_PANEL, COL_FONDO);
-  tft.setTextFont(1);
+  tft.setTextFont(2);
   for (const auto& l : lineasPanel) {
-    if (py > 232) break;   // no pintamos fuera del área visible
+    if (py > 224) break;
     tft.setCursor(LADO_IZQ + 4, py);
     tft.print(l.c_str());
-    py += 11;
+    py += 20;
   }
 }
 

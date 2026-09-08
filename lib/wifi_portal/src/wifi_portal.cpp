@@ -287,37 +287,31 @@ void WifiPortal::ejecutar(IHttpClient& http, const Config* cfgPrevia) {
   server.begin();
   Serial.println("[portal] esperando configuración...");
 
-  // Pintar QR del AP en pantalla con datos de conexión + ajustes previos si
-  // teníamos config guardada (WiFi cambió, la placa cayó al portal para que
-  // el usuario reintroduzca las credenciales).
-  //
-  // Panel derecho: 80 px de ancho, font 1 → ~15 chars por línea.
+  // Pintar QR del AP en pantalla. Panel derecho: font 2 ~8 chars por línea,
+  // hasta ~10 líneas. Trunca strings largos.
   {
     auto trunc = [](const std::string& s, size_t n) {
       if (s.size() <= n) return s;
       return s.substr(0, n - 1) + ".";
     };
     std::vector<std::string> lineas = {
-      "AP abierto:",
-      std::string(ssidAp.c_str()),
+      "AP:",
+      trunc(std::string(ssidAp.c_str()), 8),
       "",
       "IP:",
-      "192.168.4.1",
-      "",
+      "192.168.",
+      "4.1",
     };
     if (cfgPrevia) {
       char radioBuf[16];
-      std::snprintf(radioBuf, sizeof(radioBuf), "%d km", cfgPrevia->radio_km);
-      lineas.push_back("ANTERIOR");
+      std::snprintf(radioBuf, sizeof(radioBuf), "Radio %dkm", cfgPrevia->radio_km);
       lineas.push_back("");
-      lineas.push_back("WiFi:");
-      lineas.push_back(trunc(cfgPrevia->ssid, 14));
-      lineas.push_back("Lugar:");
-      lineas.push_back(trunc(cfgPrevia->direccion, 14));
-      lineas.push_back(std::string("Radio: ") + radioBuf);
+      lineas.push_back("Anterior:");
+      lineas.push_back(trunc(cfgPrevia->ssid, 8));
     } else {
-      lineas.push_back("Escanea el QR");
-      lineas.push_back("con el movil");
+      lineas.push_back("");
+      lineas.push_back("Escanea");
+      lineas.push_back("el QR");
     }
     qr_view::pintarPortalConQR(tft_driver::obtenerTft(), "Modo Portal",
                                "http://192.168.4.1/", lineas);
