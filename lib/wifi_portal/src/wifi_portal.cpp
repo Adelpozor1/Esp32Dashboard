@@ -3,6 +3,8 @@
 #include "status_led.h"
 #include "qr_view.h"
 #include "tft_driver.h"
+#include "touch.h"
+#include <TFT_eSPI.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
@@ -317,7 +319,53 @@ void WifiPortal::ejecutar(IHttpClient& http, const Config* cfgPrevia) {
                                "http://192.168.4.1/", lineas);
   }
 
+  // Botón "Borrar" abajo-derecha (rojo, con confirmación). Reset total borra
+  // toda la NVS (WiFi, dirección, calibración táctil, ajustes UI) — deja la
+  // placa como recién comprada.
+  auto& tftBot = tft_driver::obtenerTft();
+  constexpr int BX = 220, BY = 208, BW = 96, BH = 30;
+  auto pintarBoton = [&](const char* etq, uint16_t col) {
+    tftBot.fillRect(BX, BY, BW, BH, 0x0000);
+    tftBot.drawRect(BX, BY, BW, BH, col);
+    tftBot.setTextFont(2);
+    tftBot.setTextColor(col, 0x0000);
+    int16_t tw = tftBot.textWidth(etq);
+    tftBot.setCursor(BX + (BW - tw) / 2, BY + 8);
+    tftBot.print(etq);
+  };
+  pintarBoton("Borrar", 0xF800);
+
+  // Arrancar touch con calibración de cfgPrevia si existe y es válida;
+  // si no, usar defaults tentativos (suficientes para tapear un botón grande).
+  touch::CalibracionTouch cal{300, 3800, 300, 3800, true};
+  if (cfgPrevia && cfgPrevia->touch_calibrado) {
+    cal = {cfgPrevia->touch_min_x, cfgPrevia->touch_max_x,
+           cfgPrevia->touch_min_y, cfgPrevia->touch_max_y, true};
+  }
+  touch::iniciar(cal);
+
+  uint32_t confirmadoHasta = 0;
   for (;;) {
-    delay(1000);
+    touch::EventoTactil ev;
+    if (touch::esperarEvento(ev, 500)) {
+      const uint32_t ahora = millis();
+      if (ev.tipo == touch::TipoEvento::TAP &&
+          ev.x >= BX && ev.x <= BX + BW &&
+          ev.y >= BY && ev.y <= BY + BH) {
+        if (ahora < confirmadoHasta) {
+          Serial.println("[portal] usuario confirmó Reset total");
+          ConfigStore::borrar();
+          delay(500);
+          ESP.restart();
+        } else {
+          pintarBoton("Confirmar?", 0xFEA0);   // amarillo
+          confirmadoHasta = ahora + 4000;
+        }
+      }
+    }
+    if (confirmadoHasta && millis() >= confirmadoHasta) {
+      pintarBoton("Borrar", 0xF800);
+      confirmadoHasta = 0;
+    }
   }
 }
